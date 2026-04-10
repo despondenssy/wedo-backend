@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
+from django.shortcuts import get_object_or_404
 
 from .serializers import (
     RegisterSerializer,
@@ -61,7 +62,7 @@ class LoginView(APIView):
             )
 
         return Response({
-            'user': UserProfileSerializer(user, context={'request': request}).data,
+            'user': UserProfileSerializer(user, context={'request': request, 'override_user': user}).data,
             'tokens': get_tokens(user),
         })
 
@@ -92,3 +93,11 @@ class MePrivacyView(APIView):
 
         serializer.update(request.user, serializer.validated_data)
         return Response(request.user.privacy)
+
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
+        serializer = UserProfileSerializer(user, context={'request': request})
+        return Response(serializer.data)
