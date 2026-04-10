@@ -5,6 +5,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.shortcuts import get_object_or_404
+from activities.serializers import ActivityListItemSerializer
+from activities.models import Activity
+from django.utils import timezone
 
 from .serializers import (
     RegisterSerializer,
@@ -101,3 +104,64 @@ class UserDetailView(APIView):
         user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
         serializer = UserProfileSerializer(user, context={'request': request})
         return Response(serializer.data)
+
+class UserHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
+        tab = request.query_params.get('tab', 'created')
+        limit = min(int(request.query_params.get('limit', 20)), 50)
+        cursor = request.query_params.get('cursor')
+
+        if tab == 'created':
+            queryset = Activity.objects.filter(
+                organizer=user
+            ).select_related('organizer')
+
+        elif tab == 'upcoming':
+            # активности где пользователь участник и они ещё не прошли
+            from participation.models import Participation
+            activity_ids = Participation.objects.filter(
+                user=user,
+                status='accepted',
+            ).values_list('activity_id', flat=True)
+            queryset = Activity.objects.filter(
+                id__in=activity_ids,
+                start_at__gte=timezone.now(),
+                status=Activity.Status.ACTIVE,
+            ).select_related('organizer')
+
+        elif tab == 'attended':
+            # активности где посещение подтверждено
+            from participation.models import Participation
+            activity_ids = Participation.objects.filter(
+                user=user,
+                status='attended',
+            ).values_list('activity_id', flat=True)
+            queryset = Activity.objects.filter(
+                id__in=activity_ids,
+            ).select_related('organizer')
+
+        else:
+            return Response(
+                {'error': {'code': 'INVALID_TAB', 'message': 'Допустимые значения: created, upcoming, attended'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if cursor:
+            queryset = queryset.filter(id__lt=cursor)
+
+        queryset = queryset.order_by('-start_at')[:limit + 1]
+        items = list(queryset)
+        has_more = len(items) > limit
+        if has_more:
+            items = items[:limit]
+
+        next_cursor = str(items[-1].id) if has_more and items else None
+
+        return Response({
+            'items': ActivityListItemSerializer(items, many=True).data,
+            'nextCursor': next_cursor,
+            'hasMore': has_more,
+        })
