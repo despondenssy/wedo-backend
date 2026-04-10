@@ -1,3 +1,94 @@
-from django.shortcuts import render
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model, authenticate
 
-# Create your views here.
+from .serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    UpdateMeSerializer,
+    UpdatePrivacySerializer,
+    UserProfileSerializer,
+)
+
+User = get_user_model()
+
+
+def get_tokens(user):
+    """Генерирует пару access/refresh токенов для пользователя."""
+    refresh = RefreshToken.for_user(user)
+    return {
+        'accessToken': str(refresh.access_token),
+        'refreshToken': str(refresh),
+        'expiresAt': refresh.access_token['exp'],
+    }
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        return Response({
+            'user': UserProfileSerializer(user, context={'request': request, 'override_user': user}).data,
+            'tokens': get_tokens(user),
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(
+            request,
+            username=serializer.validated_data['email'],
+            password=serializer.validated_data['password'],
+        )
+        if not user:
+            return Response(
+                {'error': {'code': 'INVALID_CREDENTIALS', 'message': 'Неверный email или пароль'}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        return Response({
+            'user': UserProfileSerializer(user, context={'request': request}).data,
+            'tokens': get_tokens(user),
+        })
+
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UpdateMeSerializer(request.user, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        return Response(UserProfileSerializer(user, context={'request': request}).data)
+
+
+class MePrivacyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        serializer = UpdatePrivacySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.update(request.user, serializer.validated_data)
+        return Response(request.user.privacy)

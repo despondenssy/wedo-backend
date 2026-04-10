@@ -14,7 +14,7 @@ Backend для мобильного приложения WeDo — поиск и 
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone <url>
+git clone https://github.com/despondenssy/wedo-backend.git
 cd wedo-backend
 ```
 
