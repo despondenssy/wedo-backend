@@ -1,3 +1,4 @@
+import secrets
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -8,6 +9,8 @@ from django.shortcuts import get_object_or_404
 from activities.serializers import ActivityListItemSerializer
 from activities.models import Activity
 from django.utils import timezone
+from .models import QrToken
+from datetime import timedelta
 
 from .serializers import (
     RegisterSerializer,
@@ -97,6 +100,7 @@ class MePrivacyView(APIView):
         serializer.update(request.user, serializer.validated_data)
         return Response(request.user.privacy)
 
+
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -104,6 +108,7 @@ class UserDetailView(APIView):
         user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
         serializer = UserProfileSerializer(user, context={'request': request})
         return Response(serializer.data)
+
 
 class UserHistoryView(APIView):
     permission_classes = [IsAuthenticated]
@@ -164,4 +169,121 @@ class UserHistoryView(APIView):
             'items': ActivityListItemSerializer(items, many=True).data,
             'nextCursor': next_cursor,
             'hasMore': has_more,
+        })
+
+
+class QrTokenView(APIView):
+    """POST /me/qr-token — получить или обновить свой QR-токен."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # токен живёт 1 минуту — короткий TTL для безопасности
+        expires_at = timezone.now() + timedelta(minutes=1)
+        token = f"qr:{request.user.id}:{int(timezone.now().timestamp())}:{secrets.token_hex(4)}"
+
+        # удаляем старые токены пользователя
+        QrToken.objects.filter(user=request.user).delete()
+
+        qr_token = QrToken.objects.create(
+            user=request.user,
+            token=token,
+            expires_at=expires_at,
+        )
+
+        return Response({
+            'token': qr_token.token,
+            'expiresAt': qr_token.expires_at,
+        })
+
+
+class QrTokenResolveView(APIView):
+    """POST /qr-tokens/resolve — расшифровать QR-токен и получить данные пользователя."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token_str = request.data.get('token')
+        if not token_str:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'token обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            qr_token = QrToken.objects.select_related('user').get(token=token_str)
+        except QrToken.DoesNotExist:
+            return Response(
+                {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден или уже использован'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if qr_token.is_expired:
+            return Response(
+                {'error': {'code': 'TOKEN_EXPIRED', 'message': 'Токен истёк'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .serializers import UserSnippetSerializer
+        return Response({
+            'user': UserSnippetSerializer(qr_token.user).data,
+            'expiresAt': qr_token.expires_at,
+        })
+
+
+class QrAttendanceScanView(APIView):
+    """POST /activities/:id/attendance/scan — отметить посещение через QR."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, activity_id):
+        from activities.models import Activity
+        from participation.models import Participation
+        from django.shortcuts import get_object_or_404
+
+        activity = get_object_or_404(Activity, id=activity_id)
+
+        if activity.organizer != request.user:
+            return Response(
+                {'error': {'code': 'FORBIDDEN', 'message': 'Только организатор может сканировать QR'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        token_str = request.data.get('token')
+        if not token_str:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'token обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            qr_token = QrToken.objects.select_related('user').get(token=token_str)
+        except QrToken.DoesNotExist:
+            return Response(
+                {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if qr_token.is_expired:
+            return Response(
+                {'error': {'code': 'TOKEN_EXPIRED', 'message': 'Токен истёк'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        participation = get_object_or_404(
+            Participation,
+            activity=activity,
+            user=qr_token.user,
+            status=Participation.Status.ACCEPTED,
+        )
+
+        participation.status = Participation.Status.ATTENDED
+        participation.attendance_marked_at = timezone.now()
+        participation.save()
+
+        # помечаем токен как использованный
+        qr_token.used_at = timezone.now()
+        qr_token.save()
+
+        return Response({
+            'activityId': str(activity_id),
+            'userId': str(qr_token.user.id),
+            'participationStatus': participation.status,
         })
