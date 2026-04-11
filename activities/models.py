@@ -62,6 +62,8 @@ class Activity(models.Model):
     class Meta:
         db_table = 'activities'
         ordering = ['-created_at']
+        verbose_name = 'Activity'
+        verbose_name_plural = 'Activities'
 
     def __str__(self):
         return self.title
