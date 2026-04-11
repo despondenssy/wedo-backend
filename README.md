@@ -4,10 +4,11 @@ Backend для мобильного приложения WeDo — поиск и 
 
 ## Стек
 
-- Python 3.10+
+- Python 3.12
 - Django + Django REST Framework
 - PostgreSQL
 - JWT-аутентификация
+- Docker
 
 ## Локальный запуск
 
@@ -52,3 +53,30 @@ python manage.py runserver
 ```
 
 Сервер будет доступен по адресу: `http://127.0.0.1:8000`
+
+---
+
+## Запуск через Docker
+
+### 1. Переменные окружения для Docker
+
+```bash
+cp .env.example .env.docker
+```
+
+Открыть `.env.docker` и заполнить. Обязательно указать `DB_HOST=db`.
+
+### 2. Собрать и запустить
+
+```bash
+docker compose build
+docker compose up
+```
+
+Миграции применятся автоматически. Сервер будет доступен по адресу: `http://127.0.0.1:8000`
+
+### 3. Остановить
+
+```bash
+docker compose down
+```
