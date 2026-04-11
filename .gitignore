@@ -19,6 +19,7 @@ media/
 # IDE
 .vscode/
 .idea/
+.vs/
 *.cursor
 
 # OS
