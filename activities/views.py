@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils import timezone
 
 from .models import Activity
 from .serializers import (
@@ -142,34 +143,137 @@ class RecommendedActivitiesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Рекомендации по интересам и городу текущего пользователя."""
         user = request.user
+        now = timezone.now()
+
         queryset = Activity.objects.filter(
-            status=Activity.Status.ACTIVE
-        ).select_related('organizer')
-
-        if user.interests:
-            queryset = queryset.filter(category_id__in=user.interests)
-
-        if user.city_settlement:
-            queryset = queryset.filter(location_settlement__icontains=user.city_settlement)
+            status=Activity.Status.ACTIVE,
+            start_at__gte=now,
+        ).select_related('organizer').prefetch_related('participations')
 
         cursor = request.query_params.get('cursor')
-        limit = min(int(request.query_params.get('limit', 30)), 50)
-
         if cursor:
             queryset = queryset.filter(id__lt=cursor)
 
-        queryset = queryset[:limit + 1]
-        items = list(queryset)
-        has_more = len(items) > limit
-        if has_more:
-            items = items[:limit]
+        # берём больше чтобы после scoring отдать нужное количество
+        limit = min(int(request.query_params.get('limit', 30)), 50)
+        candidates = list(queryset[:limit * 3])
 
-        next_cursor = str(items[-1].id) if has_more else None
+        scored = []
+        for activity in candidates:
+            score = self._score(activity, user)
+            scored.append((score, activity))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        items = [a for _, a in scored[:limit]]
+
+        has_more = len(candidates) > limit
+        next_cursor = str(items[-1].id) if has_more and items else None
 
         return Response({
             'items': ActivityListItemSerializer(items, many=True).data,
             'nextCursor': next_cursor,
             'hasMore': has_more,
         })
+
+    def _score(self, activity, user):
+        W_INTERESTS = 0.33
+        W_SUBSCRIPTIONS = 0.25
+        W_GEO = 0.17
+        W_SIMILAR = 0.17
+        W_POPULARITY = 0.08
+
+        return (
+            W_INTERESTS * self._interests_score(activity, user) +
+            W_SUBSCRIPTIONS * self._subscription_score(activity, user) +
+            W_GEO * self._geo_score(activity, user) +
+            W_SIMILAR * self._similar_users_score(activity, user) +
+            W_POPULARITY * self._popularity_score(activity)
+        )
+
+    def _interests_score(self, activity, user):
+        """1.0 если категория совпадает с интересами пользователя, иначе 0."""
+        if not user.interests:
+            return 0.0
+        return 1.0 if activity.category_id in user.interests else 0.0
+
+    def _subscription_score(self, activity, user):
+        """1.0 если пользователь подписан на организатора."""
+        from subscriptions.models import Subscription
+        return 1.0 if Subscription.objects.filter(
+            follower=user,
+            target=activity.organizer,
+        ).exists() else 0.0
+
+    def _geo_score(self, activity, user):
+        """1.0 если город совпадает, 0.5 если нет координат, 0.0 если разные города."""
+        if not user.city_settlement or not activity.location_settlement:
+            return 0.5
+        if user.city_settlement.lower() == activity.location_settlement.lower():
+            return 1.0
+        # если есть координаты — считаем расстояние
+        if user.city_latitude and user.city_longitude:
+            return self._distance_score(
+                user.city_latitude, user.city_longitude,
+                activity.location_latitude, activity.location_longitude,
+            )
+        return 0.0
+
+    def _distance_score(self, lat1, lon1, lat2, lon2):
+        """Чем ближе — тем выше score. До 50км = 1.0, до 200км = 0.5, дальше = 0.0."""
+        import math
+        R = 6371
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+        distance_km = R * 2 * math.asin(math.sqrt(a))
+
+        if distance_km <= 50:
+            return 1.0
+        elif distance_km <= 200:
+            return 0.5
+        return 0.0
+
+    def _similar_users_score(self, activity, user):
+        """
+        Похожие пользователи — те у кого пересекаются интересы с текущим.
+        Если они участвуют в активности, score растёт.
+        """
+        from participation.models import Participation
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        if not user.interests:
+            return 0.0
+
+        # для JSONField используем contains для каждого интереса
+        from django.db.models import Q
+        query = Q()
+        for interest in user.interests:
+            query |= Q(interests__contains=[interest])
+
+        similar_user_ids = User.objects.filter(query).exclude(
+            id=user.id
+        ).values_list('id', flat=True)[:50]
+
+        if not similar_user_ids:
+            return 0.0
+
+        participants_count = Participation.objects.filter(
+            activity=activity,
+            user_id__in=similar_user_ids,
+            status__in=['accepted', 'attended'],
+        ).count()
+
+        return min(participants_count / 5, 1.0)
+
+    def _popularity_score(self, activity):
+        """Популярность по количеству участников относительно максимума."""
+        from participation.models import Participation
+        count = Participation.objects.filter(
+            activity=activity,
+            status__in=['accepted', 'attended'],
+        ).count()
+
+        max_participants = activity.pref_max_participants or 20
+        return min(count / max_participants, 1.0)
