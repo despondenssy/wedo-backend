@@ -181,9 +181,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return self._is_current_user(obj)
 
     def get_isSubscribed(self, obj):
-        # пока подписок нет — всегда false, обновим когда будем делать subscriptions
         if self._is_current_user(obj):
             return None
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            from subscriptions.models import Subscription
+            return Subscription.objects.filter(
+                follower=request.user,
+                target=obj,
+            ).exists()
         return False
 
     def get_reviewsPreview(self, obj):
