@@ -1,3 +1,73 @@
-from django.shortcuts import render
+import os
+import uuid
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser
+from django.shortcuts import get_object_or_404
+from django.conf import settings
 
-# Create your views here.
+from .models import File
+from .serializers import FileSerializer
+
+ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+
+class FileUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'Файл обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if file.content_type not in ALLOWED_MIME_TYPES:
+            return Response(
+                {'error': {'code': 'INVALID_FILE_TYPE', 'message': 'Разрешены только изображения'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # генерируем уникальное имя чтобы не было коллизий
+        ext = os.path.splitext(file.name)[1]
+        storage_key = f"activities/{uuid.uuid4().hex}{ext}"
+        full_path = os.path.join(settings.MEDIA_ROOT, storage_key)
+
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, 'wb') as f:
+            for chunk in file.chunks():
+                f.write(chunk)
+
+        file_obj = File.objects.create(
+            storage_key=storage_key,
+            original_name=file.name,
+            mime_type=file.content_type,
+            size=file.size,
+        )
+
+        return Response(FileSerializer(file_obj).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        ids = request.query_params.get('ids', '')
+        if not ids:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'ids обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        id_list = [i.strip() for i in ids.split(',') if i.strip()]
+        files = File.objects.filter(id__in=id_list)
+
+        return Response({'items': FileSerializer(files, many=True).data})
+
+
+class FileDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, file_id):
+        file = get_object_or_404(File, id=file_id)
+        return Response(FileSerializer(file).data)
