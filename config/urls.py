@@ -23,4 +23,5 @@ urlpatterns = [
     path('', include('activities.urls')),
     path('', include('participation.urls')),
     path('', include('notifications.urls')),
+    path('', include('ratings.urls')),
 ]
