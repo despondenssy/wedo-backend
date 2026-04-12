@@ -45,7 +45,7 @@
         },
         "required": ["error"]
       },
-      "CityPlace": {
+      "City": {
         "type": "object",
         "properties": {
           "settlement": { "type": "string", "nullable": true },
@@ -61,7 +61,7 @@
         "properties": {
           "showAvatar": { "type": "boolean" },
           "showGender": { "type": "boolean" },
-          "showCityPlace": { "type": "boolean" },
+          "showCity": { "type": "boolean" },
           "showInterests": { "type": "boolean" },
           "showBirthDate": { "type": "boolean" },
           "showAttendanceHistory": { "type": "boolean" },
@@ -94,10 +94,26 @@
           "rating": { "type": "number" },
           "age": { "type": "integer", "nullable": true },
           "gender": { "type": "string", "nullable": true },
-          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" }, "nullable": true },
           "attendanceHistory": { "allOf": [{ "$ref": "#/components/schemas/AttendanceHistory" }], "nullable": true },
-          "reviewsPreview": { "type": "array", "items": {}, "nullable": true },
+          "reviewsPreview": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "fromUserId": { "type": "string" },
+                "fromUserName": { "type": "string" },
+                "rating": { "type": "number" },
+                "text": { "type": "string" },
+                "date": { "type": "string", "format": "date-time" },
+                "activityId": { "type": "string" }
+              },
+              "required": ["id", "fromUserId", "fromUserName", "rating", "text", "date", "activityId"]
+            }
+          },
           "privacy": { "allOf": [{ "$ref": "#/components/schemas/Privacy" }], "nullable": true },
           "isCurrentUser": { "type": "boolean" },
           "isSubscribed": { "type": "boolean", "nullable": true }
@@ -129,11 +145,11 @@
           "password": { "type": "string", "minLength": 6 },
           "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
-          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
           "showBirthDate": { "type": "boolean" }
         },
-        "required": ["name", "email", "password", "birth_date", "gender", "cityPlace", "showBirthDate"]
+        "required": ["name", "email", "password", "birth_date", "gender", "city", "showBirthDate"]
       },
       "LoginRequest": {
         "type": "object",
@@ -150,7 +166,7 @@
           "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
           "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
-          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } }
         }
       },
@@ -159,7 +175,7 @@
         "properties": {
           "showAvatar": { "type": "boolean" },
           "showGender": { "type": "boolean" },
-          "showCityPlace": { "type": "boolean" },
+          "showCity": { "type": "boolean" },
           "showInterests": { "type": "boolean" },
           "showBirthDate": { "type": "boolean" },
           "showAttendanceHistory": { "type": "boolean" },

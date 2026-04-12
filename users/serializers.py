@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-class CityPlaceSerializer(serializers.Serializer):
+class CitySerializer(serializers.Serializer):
     settlement = serializers.CharField()
     region = serializers.CharField()
     country = serializers.CharField()
@@ -16,7 +16,7 @@ class CityPlaceSerializer(serializers.Serializer):
 class PrivacySerializer(serializers.Serializer):
     showAvatar = serializers.BooleanField()
     showGender = serializers.BooleanField()
-    showCityPlace = serializers.BooleanField()
+    showCity = serializers.BooleanField()
     showInterests = serializers.BooleanField()
     showBirthDate = serializers.BooleanField()
     showAttendanceHistory = serializers.BooleanField()
@@ -25,15 +25,15 @@ class PrivacySerializer(serializers.Serializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
-    cityPlace = CityPlaceSerializer()
+    city = CitySerializer()
     showBirthDate = serializers.BooleanField(source='show_birth_date')
 
     class Meta:
         model = User
-        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'cityPlace', 'interests', 'showBirthDate']
+        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'showBirthDate']
 
     def create(self, validated_data):
-        city_data = validated_data.pop('cityPlace')
+        city_data = validated_data.pop('city')
         password = validated_data.pop('password')
 
         user = User(
@@ -56,12 +56,12 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UpdateMeSerializer(serializers.ModelSerializer):
-    cityPlace = CityPlaceSerializer(required=False)
+    city = CitySerializer(required=False)
     avatarUrl = serializers.URLField(required=False, allow_null=True, source='avatar_url')
 
     class Meta:
         model = User
-        fields = ['name', 'avatarUrl', 'birth_date', 'gender', 'cityPlace', 'interests']
+        fields = ['name', 'avatarUrl', 'birth_date', 'gender', 'city', 'interests']
         extra_kwargs = {
             'name': {'required': False},
             'birth_date': {'required': False},
@@ -70,7 +70,7 @@ class UpdateMeSerializer(serializers.ModelSerializer):
         }
 
     def update(self, instance, validated_data):
-        city_data = validated_data.pop('cityPlace', None)
+        city_data = validated_data.pop('city', None)
         if city_data:
             instance.city_settlement = city_data['settlement']
             instance.city_region = city_data['region']
@@ -89,7 +89,7 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 class UpdatePrivacySerializer(serializers.Serializer):
     showAvatar = serializers.BooleanField(required=False)
     showGender = serializers.BooleanField(required=False)
-    showCityPlace = serializers.BooleanField(required=False)
+    showCity = serializers.BooleanField(required=False)
     showInterests = serializers.BooleanField(required=False)
     showBirthDate = serializers.BooleanField(required=False)
     showAttendanceHistory = serializers.BooleanField(required=False)
@@ -99,7 +99,7 @@ class UpdatePrivacySerializer(serializers.Serializer):
         mapping = {
             'showAvatar': 'show_avatar',
             'showGender': 'show_gender',
-            'showCityPlace': 'show_city_place',
+            'showCity': 'show_city',
             'showInterests': 'show_interests',
             'showBirthDate': 'show_birth_date',
             'showAttendanceHistory': 'show_attendance_history',
@@ -115,7 +115,7 @@ class UpdatePrivacySerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
     avatarUrl = serializers.SerializerMethodField()
-    cityPlace = serializers.SerializerMethodField()
+    city = serializers.SerializerMethodField()
     privacy = serializers.SerializerMethodField()
     attendanceHistory = serializers.SerializerMethodField()
     isCurrentUser = serializers.SerializerMethodField()
@@ -129,7 +129,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'name', 'avatarUrl', 'rating', 'age', 'gender',
-            'cityPlace', 'interests', 'attendanceHistory',
+            'city', 'interests', 'attendanceHistory',
             'reviewsPreview', 'privacy', 'isCurrentUser', 'isSubscribed',
         ]
 
@@ -157,9 +157,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.gender
         return None
 
-    def get_cityPlace(self, obj):
-        if self._is_current_user(obj) or obj.show_city_place:
-            return obj.city_place
+    def get_city(self, obj):
+        if self._is_current_user(obj) or obj.show_city:
+            return obj.city
         return None
 
     def get_interests(self, obj):

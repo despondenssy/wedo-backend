@@ -32,7 +32,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     rating = models.FloatField(default=0.0)
     interests = models.JSONField(default=list, blank=True)
 
-    # cityPlace
+    # city
     city_settlement = models.CharField(max_length=255, blank=True, null=True)
     city_region = models.CharField(max_length=255, blank=True, null=True)
     city_country = models.CharField(max_length=255, blank=True, null=True)
@@ -43,7 +43,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # privacy
     show_avatar = models.BooleanField(default=True)
     show_gender = models.BooleanField(default=True)
-    show_city_place = models.BooleanField(default=True)
+    show_city = models.BooleanField(default=True)
     show_interests = models.BooleanField(default=True)
     show_birth_date = models.BooleanField(default=False)
     show_attendance_history = models.BooleanField(default=True)
@@ -75,7 +75,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
 
     @property
-    def city_place(self):
+    def city(self):
         return {
             'settlement': self.city_settlement,
             'region': self.city_region,
@@ -90,7 +90,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return {
             'showAvatar': self.show_avatar,
             'showGender': self.show_gender,
-            'showCityPlace': self.show_city_place,
+            'showCity': self.show_city,
             'showInterests': self.show_interests,
             'showBirthDate': self.show_birth_date,
             'showAttendanceHistory': self.show_attendance_history,
