@@ -54,18 +54,6 @@ python manage.py runserver
 
 Сервер будет доступен по адресу: `http://127.0.0.1:8000`
 
-## API Docs
-
-Swagger UI: `http://127.0.0.1:8000/api/docs/swagger/`
-
-ReDoc: `http://127.0.0.1:8000/api/docs/redoc/`
-
-Сгенерировать OpenAPI схему локально:
-
-```bash
-python manage.py spectacular --file openapi.json
-```
-
 ---
 
 ## Запуск через Docker

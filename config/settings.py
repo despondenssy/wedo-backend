@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',
-    'drf_spectacular',
     # our apps
     'users',
     'activities',
@@ -147,7 +146,6 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
     ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
     'PAGE_SIZE': 30,
 }
@@ -157,28 +155,6 @@ from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
-}
-
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'WeDo Backend API',
-    'DESCRIPTION': 'API documentation for the WeDo backend service.',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'SCHEMA_PATH_PREFIX': r'/',
-    'SWAGGER_UI_SETTINGS': {
-        'persistAuthorization': True,
-    },
-    'COMPONENT_SPLIT_REQUEST': True,
-    'TAGS': [
-        {'name': 'auth', 'description': 'Authentication endpoints.'},
-        {'name': 'users', 'description': 'User profile and history endpoints.'},
-        {'name': 'activities', 'description': 'Activity listing and management endpoints.'},
-        {'name': 'participation', 'description': 'Participation and attendance endpoints.'},
-        {'name': 'notifications', 'description': 'Notification endpoints.'},
-        {'name': 'ratings', 'description': 'Rating endpoints.'},
-        {'name': 'subscriptions', 'description': 'Subscription endpoints.'},
-        {'name': 'files', 'description': 'File upload and retrieval endpoints.'},
-    ],
 }
 
 AUTH_USER_MODEL = 'users.User'
