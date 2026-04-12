@@ -194,9 +194,28 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return False
 
     def get_reviewsPreview(self, obj):
-        if self._is_current_user(obj) or obj.show_reviews:
-            return []
-        return None
+        if not (self._is_current_user(obj) or obj.show_reviews):
+            return None
+
+        from ratings.models import ActivityRating
+        # берём последние 3 отзыва на активности где obj был организатором
+        ratings = ActivityRating.objects.filter(
+            activity__organizer=obj,
+            comment__isnull=False,
+        ).select_related('user', 'activity').order_by('-created_at')[:3]
+
+        return [
+            {
+                'id': str(r.id),
+                'fromUserId': str(r.user.id),
+                'fromUserName': r.user.name,
+                'rating': r.rating,
+                'text': r.comment,
+                'date': r.created_at.isoformat(),
+                'activityId': str(r.activity.id),
+            }
+            for r in ratings
+        ]
 
 class UserSnippetSerializer(serializers.ModelSerializer):
     """Компактный профиль для вложений — карточки активностей, списки участников."""
