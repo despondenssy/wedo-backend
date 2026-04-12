@@ -1,4 +1,5 @@
 import secrets
+from datetime import UTC, datetime, timedelta
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,7 +11,6 @@ from activities.serializers import ActivityListItemSerializer
 from activities.models import Activity
 from django.utils import timezone
 from .models import QrToken
-from datetime import timedelta
 
 from .serializers import (
     RegisterSerializer,
@@ -23,13 +23,18 @@ from .serializers import (
 User = get_user_model()
 
 
+def unix_timestamp_to_iso8601(timestamp):
+    dt = datetime.fromtimestamp(timestamp, tz=UTC)
+    return dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+
 def get_tokens(user):
     """Генерирует пару access/refresh токенов для пользователя."""
     refresh = RefreshToken.for_user(user)
     return {
         'accessToken': str(refresh.access_token),
         'refreshToken': str(refresh),
-        'expiresAt': refresh.access_token['exp'],
+        'expiresAt': unix_timestamp_to_iso8601(refresh.access_token['exp']),
     }
 
 
