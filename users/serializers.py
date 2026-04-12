@@ -57,11 +57,11 @@ class LoginSerializer(serializers.Serializer):
 
 class UpdateMeSerializer(serializers.ModelSerializer):
     city = CitySerializer(required=False)
-    avatarUrl = serializers.URLField(required=False, allow_null=True, source='avatar_url')
+    avatarFileId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = User
-        fields = ['name', 'avatarUrl', 'birth_date', 'gender', 'city', 'interests']
+        fields = ['name', 'avatarFileId', 'birth_date', 'gender', 'city', 'interests']
         extra_kwargs = {
             'name': {'required': False},
             'birth_date': {'required': False},
@@ -71,6 +71,8 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         city_data = validated_data.pop('city', None)
+        avatar_file_id = validated_data.pop('avatarFileId', None)
+
         if city_data:
             instance.city_settlement = city_data['settlement']
             instance.city_region = city_data['region']
@@ -78,6 +80,13 @@ class UpdateMeSerializer(serializers.ModelSerializer):
             instance.city_latitude = city_data['latitude']
             instance.city_longitude = city_data['longitude']
             instance.city_title = city_data.get('title', '')
+
+        if avatar_file_id is not None:
+            from files.models import File
+            try:
+                instance.avatar_file = File.objects.get(id=avatar_file_id)
+            except File.DoesNotExist:
+                pass
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -114,7 +123,7 @@ class UpdatePrivacySerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
-    avatarUrl = serializers.SerializerMethodField()
+    avatarFileId = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
     privacy = serializers.SerializerMethodField()
     attendanceHistory = serializers.SerializerMethodField()
@@ -128,7 +137,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'avatarUrl', 'rating', 'age', 'gender',
+            'id', 'name', 'avatarFileId', 'rating', 'age', 'gender',
             'city', 'interests', 'attendanceHistory',
             'reviewsPreview', 'privacy', 'isCurrentUser', 'isSubscribed',
         ]
@@ -142,9 +151,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return request.user.id == obj.id
         return False
 
-    def get_avatarUrl(self, obj):
+    def get_avatarFileId(self, obj):
         if self._is_current_user(obj) or obj.show_avatar:
-            return obj.avatar_url
+            return str(obj.avatar_file_id) if obj.avatar_file_id else None
         return None
 
     def get_age(self, obj):
@@ -220,8 +229,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserSnippetSerializer(serializers.ModelSerializer):
     """Компактный профиль для вложений — карточки активностей, списки участников."""
     id = serializers.CharField()
-    avatarUrl = serializers.URLField(source='avatar_url', allow_null=True)
+    avatarFileId = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'avatarUrl', 'rating']
+        fields = ['id', 'name', 'avatarFileId', 'rating']
+
+    def get_avatarFileId(self, obj):
+        return str(obj.avatar_file_id) if obj.avatar_file_id else None

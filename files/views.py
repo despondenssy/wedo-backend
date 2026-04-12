@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.http import FileResponse
 
 from .models import File
 from .serializers import FileSerializer
@@ -70,4 +71,19 @@ class FileDetailView(APIView):
 
     def get(self, request, file_id):
         file = get_object_or_404(File, id=file_id)
-        return Response(FileSerializer(file).data)
+        full_path = os.path.join(settings.MEDIA_ROOT, file.storage_key)
+
+        if not os.path.exists(full_path):
+            return Response(
+                {'error': {'code': 'FILE_NOT_FOUND', 'message': 'Файл не найден на диске'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FileResponse(
+            open(full_path, 'rb'),
+            content_type=file.mime_type,
+            as_attachment=False,
+        )
+        response['Content-Length'] = file.size
+        response['Cache-Control'] = 'max-age=86400'
+        return response

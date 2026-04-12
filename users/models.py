@@ -28,7 +28,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField(max_length=255)
     birth_date = models.DateField()
     gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.NOT_GIVEN)
-    avatar_url = models.URLField(blank=True, null=True)
+    avatar_file = models.ForeignKey(
+        'files.File',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='user_avatars',
+    )
     rating = models.FloatField(default=0.0)
     interests = models.JSONField(default=list, blank=True)
 

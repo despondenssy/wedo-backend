@@ -73,7 +73,7 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "avatarFileId": { "type": "string", "nullable": true },
           "rating": { "type": "number" }
         },
         "required": ["id", "name", "rating"]
@@ -90,7 +90,7 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "avatarFileId": { "type": "string", "nullable": true },
           "rating": { "type": "number" },
           "age": { "type": "integer", "nullable": true },
           "gender": { "type": "string", "nullable": true },
@@ -163,7 +163,7 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
-          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "avatarFileId": { "type": "string", "nullable": true },
           "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
@@ -1339,16 +1339,24 @@
     "/files/{file_id}": {
       "get": {
         "tags": ["files"],
-        "summary": "Get file metadata",
+        "summary": "Get file binary",
         "parameters": [
           { "name": "file_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
           "200": {
-            "description": "File metadata",
+            "description": "Binary file content",
+            "content": {
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } },
+              "image/png": { "schema": { "type": "string", "format": "binary" } },
+              "image/webp": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "404": {
+            "description": "File not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/File" }
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
