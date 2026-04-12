@@ -1,0 +1,1342 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WeDo Backend API",
+    "version": "1.0.0",
+    "description": "OpenAPI specification for the WeDo backend."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    { "name": "auth" },
+    { "name": "users" },
+    { "name": "activities" },
+    { "name": "participation" },
+    { "name": "notifications" },
+    { "name": "ratings" },
+    { "name": "subscriptions" },
+    { "name": "files" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["code", "message"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "$ref": "#/components/schemas/ErrorDetail" }
+        },
+        "required": ["error"]
+      },
+      "CityPlace": {
+        "type": "object",
+        "properties": {
+          "settlement": { "type": "string", "nullable": true },
+          "region": { "type": "string", "nullable": true },
+          "country": { "type": "string", "nullable": true },
+          "latitude": { "type": "number", "nullable": true },
+          "longitude": { "type": "number", "nullable": true },
+          "title": { "type": "string", "nullable": true }
+        }
+      },
+      "Privacy": {
+        "type": "object",
+        "properties": {
+          "showAvatar": { "type": "boolean" },
+          "showGender": { "type": "boolean" },
+          "showCityPlace": { "type": "boolean" },
+          "showInterests": { "type": "boolean" },
+          "showBirthDate": { "type": "boolean" },
+          "showAttendanceHistory": { "type": "boolean" },
+          "showReviews": { "type": "boolean" }
+        }
+      },
+      "UserSnippet": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "rating": { "type": "number" }
+        },
+        "required": ["id", "name", "rating"]
+      },
+      "AttendanceHistory": {
+        "type": "object",
+        "properties": {
+          "attended": { "type": "integer" },
+          "missed": { "type": "integer" }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "rating": { "type": "number" },
+          "age": { "type": "integer", "nullable": true },
+          "gender": { "type": "string", "nullable": true },
+          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "interests": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "attendanceHistory": { "allOf": [{ "$ref": "#/components/schemas/AttendanceHistory" }], "nullable": true },
+          "reviewsPreview": { "type": "array", "items": {}, "nullable": true },
+          "privacy": { "allOf": [{ "$ref": "#/components/schemas/Privacy" }], "nullable": true },
+          "isCurrentUser": { "type": "boolean" },
+          "isSubscribed": { "type": "boolean", "nullable": true }
+        },
+        "required": ["id", "name", "rating", "isCurrentUser"]
+      },
+      "AuthTokens": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "expiresAt": { "type": "integer" }
+        },
+        "required": ["accessToken", "refreshToken", "expiresAt"]
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/UserProfile" },
+          "tokens": { "$ref": "#/components/schemas/AuthTokens" }
+        },
+        "required": ["user", "tokens"]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 },
+          "birth_date": { "type": "string", "format": "date" },
+          "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
+          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "interests": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name", "email", "password", "birth_date", "gender", "cityPlace"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        },
+        "required": ["email", "password"]
+      },
+      "UpdateMeRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "birth_date": { "type": "string", "format": "date" },
+          "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
+          "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
+          "interests": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "UpdatePrivacyRequest": {
+        "type": "object",
+        "properties": {
+          "showAvatar": { "type": "boolean" },
+          "showGender": { "type": "boolean" },
+          "showCityPlace": { "type": "boolean" },
+          "showInterests": { "type": "boolean" },
+          "showBirthDate": { "type": "boolean" },
+          "showAttendanceHistory": { "type": "boolean" },
+          "showReviews": { "type": "boolean" }
+        }
+      },
+      "QrTokenResolveRequest": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" }
+        },
+        "required": ["token"]
+      },
+      "QrTokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["token", "expiresAt"]
+      },
+      "QrTokenResolveResponse": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/UserSnippet" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["user", "expiresAt"]
+      },
+      "ActivityLocation": {
+        "type": "object",
+        "properties": {
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "address": { "type": "string" },
+          "name": { "type": "string", "nullable": true },
+          "settlement": { "type": "string", "nullable": true }
+        },
+        "required": ["latitude", "longitude", "address"]
+      },
+      "ActivityPreferences": {
+        "type": "object",
+        "properties": {
+          "gender": { "type": "string", "enum": ["male", "female"], "nullable": true },
+          "ageFrom": { "type": "integer", "nullable": true },
+          "ageTo": { "type": "integer", "nullable": true },
+          "level": { "type": "string", "enum": ["beginner", "intermediate", "advanced"], "nullable": true },
+          "maxParticipants": { "type": "integer", "nullable": true }
+        }
+      },
+      "ActivityListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "endAt": { "type": "string", "format": "date-time" },
+          "format": { "type": "string", "enum": ["online", "offline"] },
+          "status": { "type": "string", "enum": ["active", "cancelled"] },
+          "location": { "$ref": "#/components/schemas/ActivityLocation" },
+          "categoryId": { "type": "string" },
+          "subcategoryId": { "type": "string", "nullable": true },
+          "coverPhotoFileId": { "type": "string", "nullable": true },
+          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "organizer": { "$ref": "#/components/schemas/UserSnippet" },
+          "participantsCount": { "type": "integer" },
+          "maxParticipants": { "type": "integer", "nullable": true },
+          "requiresApproval": { "type": "boolean" },
+          "preferences": { "allOf": [{ "$ref": "#/components/schemas/ActivityPreferences" }], "nullable": true },
+          "price": { "type": "string" }
+        },
+        "required": ["id", "title", "startAt", "endAt", "format", "status", "location", "categoryId", "photoFileIds", "organizer", "participantsCount", "requiresApproval", "price"]
+      },
+      "ActivityDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ActivityListItem" },
+          {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "timeZone": { "type": "string" },
+              "participantsPreview": { "type": "array", "items": {} },
+              "isSaved": { "type": "boolean" },
+              "participationStatus": { "type": "string", "nullable": true }
+            },
+            "required": ["description", "timeZone", "participantsPreview", "isSaved"]
+          }
+        ]
+      },
+      "ActivityListResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityListItem" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "CreateActivityRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "categoryId": { "type": "string" },
+          "subcategoryId": { "type": "string", "nullable": true },
+          "format": { "type": "string", "enum": ["online", "offline"] },
+          "location": { "$ref": "#/components/schemas/ActivityLocation" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "endAt": { "type": "string", "format": "date-time" },
+          "timeZone": { "type": "string" },
+          "preferences": { "$ref": "#/components/schemas/ActivityPreferences" },
+          "requiresApproval": { "type": "boolean" },
+          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "price": { "type": "string" }
+        },
+        "required": ["title", "description", "categoryId", "format", "location", "startAt", "endAt", "price"]
+      },
+      "UpdateActivityRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "format": { "type": "string", "enum": ["online", "offline"] },
+          "location": { "$ref": "#/components/schemas/ActivityLocation" },
+          "startAt": { "type": "string", "format": "date-time" },
+          "endAt": { "type": "string", "format": "date-time" },
+          "timeZone": { "type": "string" },
+          "preferences": { "$ref": "#/components/schemas/ActivityPreferences" },
+          "requiresApproval": { "type": "boolean" },
+          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "price": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "cancelled"] }
+        }
+      },
+      "ParticipationStatus": {
+        "type": "object",
+        "properties": {
+          "activityId": { "type": "string" },
+          "participationStatus": { "type": "string", "nullable": true }
+        },
+        "required": ["activityId"]
+      },
+      "ParticipationDecision": {
+        "type": "object",
+        "properties": {
+          "activityId": { "type": "string" },
+          "userId": { "type": "string" },
+          "participationStatus": { "type": "string" }
+        },
+        "required": ["activityId", "userId", "participationStatus"]
+      },
+      "ActivityParticipant": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/UserSnippet" },
+          "participationStatus": { "type": "string" }
+        },
+        "required": ["user", "participationStatus"]
+      },
+      "ActivityParticipantsResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityParticipant" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "AttendanceMarkRequest": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "integer" }
+        },
+        "required": ["userId"]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "message": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "read": { "type": "boolean" },
+          "activityId": { "type": "string", "nullable": true },
+          "requestUserId": { "type": "string", "nullable": true },
+          "actionRequired": { "type": "boolean" },
+          "activityTitle": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "type", "title", "message", "timestamp", "read", "actionRequired"]
+      },
+      "NotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "UpdateNotificationRequest": {
+        "type": "object",
+        "properties": {
+          "read": { "type": "boolean" }
+        }
+      },
+      "NotificationReadResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "read": { "type": "boolean" }
+        },
+        "required": ["id", "read"]
+      },
+      "NotificationDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "deleted": { "type": "boolean" }
+        },
+        "required": ["id", "deleted"]
+      },
+      "ReadAllNotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "updatedCount": { "type": "integer" }
+        },
+        "required": ["success", "updatedCount"]
+      },
+      "UnreadCountResponse": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer" }
+        },
+        "required": ["count"]
+      },
+      "ActivityRating": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/UserSnippet" },
+          "rating": { "type": "integer" },
+          "comment": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "user", "rating", "createdAt"]
+      },
+      "ActivityRatingsResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityRating" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "CreateActivityRatingRequest": {
+        "type": "object",
+        "properties": {
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string", "nullable": true }
+        },
+        "required": ["rating"]
+      },
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "subscribedAt": { "type": "string", "format": "date-time" },
+          "isPinned": { "type": "boolean" },
+          "user": { "$ref": "#/components/schemas/UserSnippet" }
+        },
+        "required": ["userId", "subscribedAt", "isPinned", "user"]
+      },
+      "SubscriptionsResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Subscription" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "CreateSubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "integer" }
+        },
+        "required": ["userId"]
+      },
+      "CreateSubscriptionResponse": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "subscribedAt": { "type": "string", "format": "date-time" },
+          "isPinned": { "type": "boolean" }
+        },
+        "required": ["userId", "subscribedAt", "isPinned"]
+      },
+      "UpdateSubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "isPinned": { "type": "boolean" }
+        }
+      },
+      "SubscriptionDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "deleted": { "type": "boolean" }
+        },
+        "required": ["userId", "deleted"]
+      },
+      "SubscriptionUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "isPinned": { "type": "boolean" }
+        },
+        "required": ["userId", "isPinned"]
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "originalName": { "type": "string" },
+          "mimeType": { "type": "string" },
+          "size": { "type": "integer" }
+        },
+        "required": ["id", "originalName", "mimeType", "size"]
+      },
+      "FilesResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/File" } }
+        },
+        "required": ["items"]
+      }
+    }
+  },
+  "security": [
+    { "BearerAuth": [] }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login with email and password",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get current user profile",
+        "responses": {
+          "200": {
+            "description": "Current user profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["users"],
+        "summary": "Update current user profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateMeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/privacy": {
+      "patch": {
+        "tags": ["users"],
+        "summary": "Update privacy settings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdatePrivacyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated privacy settings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Privacy" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/qr-token": {
+      "post": {
+        "tags": ["users"],
+        "summary": "Create or refresh QR token",
+        "responses": {
+          "200": {
+            "description": "QR token payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/QrTokenResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user profile by id",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/history": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user activity history",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "upcoming", "attended"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity history page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qr-tokens/resolve": {
+      "post": {
+        "tags": ["users"],
+        "summary": "Resolve QR token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QrTokenResolveRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved token data",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/QrTokenResolveResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "List activities",
+        "parameters": [
+          { "name": "categoryId", "in": "query", "schema": { "type": "string" } },
+          { "name": "subcategoryId", "in": "query", "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["online", "offline"] } },
+          { "name": "city", "in": "query", "schema": { "type": "string" } },
+          { "name": "dateFrom", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "dateTo", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "level", "in": "query", "schema": { "type": "string" } },
+          { "name": "gender", "in": "query", "schema": { "type": "string" } },
+          { "name": "ageFrom", "in": "query", "schema": { "type": "integer" } },
+          { "name": "ageTo", "in": "query", "schema": { "type": "integer" } },
+          { "name": "requiresApproval", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activities page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["activities"],
+        "summary": "Create activity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateActivityRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/recommended": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "Get recommended activities",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recommended activities page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "Get activity details",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["activities"],
+        "summary": "Update activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateActivityRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/cancel": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Cancel activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/join": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Join activity without approval",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participation status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/join-requests": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Create join request",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participation status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/join-requests/me": {
+      "delete": {
+        "tags": ["participation"],
+        "summary": "Cancel own join request",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset participation status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/join-requests/{user_id}/approve": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Approve join request",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participation decision",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/join-requests/{user_id}/reject": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Reject join request",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participation decision",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/participants": {
+      "get": {
+        "tags": ["participation"],
+        "summary": "List activity participants",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participants page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityParticipantsResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/participants/me": {
+      "delete": {
+        "tags": ["participation"],
+        "summary": "Leave activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset participation status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/attendance": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Mark attendance manually",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AttendanceMarkRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Participation decision",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/attendance/scan": {
+      "post": {
+        "tags": ["participation"],
+        "summary": "Mark attendance via QR token",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QrTokenResolveRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Participation decision",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/notifications": {
+      "get": {
+        "tags": ["notifications"],
+        "summary": "List current user notifications",
+        "parameters": [
+          { "name": "unreadOnly", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "type", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotificationsResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{notification_id}": {
+      "patch": {
+        "tags": ["notifications"],
+        "summary": "Update notification read state",
+        "parameters": [
+          { "name": "notification_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateNotificationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated notification state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotificationReadResponse" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["notifications"],
+        "summary": "Delete notification",
+        "parameters": [
+          { "name": "notification_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted notification",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotificationDeleteResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "tags": ["notifications"],
+        "summary": "Mark all notifications as read",
+        "responses": {
+          "200": {
+            "description": "Bulk update result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReadAllNotificationsResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": ["notifications"],
+        "summary": "Get unread notifications count",
+        "responses": {
+          "200": {
+            "description": "Unread count",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UnreadCountResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activities/{activity_id}/ratings": {
+      "get": {
+        "tags": ["ratings"],
+        "summary": "List activity ratings",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ratings page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityRatingsResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ratings"],
+        "summary": "Create activity rating",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateActivityRatingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created rating",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityRating" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/subscriptions": {
+      "get": {
+        "tags": ["subscriptions"],
+        "summary": "List current user subscriptions",
+        "parameters": [
+          { "name": "pinnedOnly", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["subscribedAt", "name"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriptions page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubscriptionsResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["subscriptions"],
+        "summary": "Create subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSubscriptionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateSubscriptionResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscriptions/{user_id}": {
+      "patch": {
+        "tags": ["subscriptions"],
+        "summary": "Update subscription",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateSubscriptionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated subscription",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubscriptionUpdateResponse" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["subscriptions"],
+        "summary": "Delete subscription",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted subscription",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubscriptionDeleteResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "tags": ["files"],
+        "summary": "Get files by ids",
+        "parameters": [
+          { "name": "ids", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Comma-separated file ids" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Files list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FilesResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload image file",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded file metadata",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/File" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{file_id}": {
+      "get": {
+        "tags": ["files"],
+        "summary": "Get file metadata",
+        "parameters": [
+          { "name": "file_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "File metadata",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/File" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
