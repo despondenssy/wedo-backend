@@ -130,9 +130,10 @@
           "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "cityPlace": { "$ref": "#/components/schemas/CityPlace" },
-          "interests": { "type": "array", "items": { "type": "string" } }
+          "interests": { "type": "array", "items": { "type": "string" } },
+          "showBirthDate": { "type": "boolean" }
         },
-        "required": ["name", "email", "password", "birth_date", "gender", "cityPlace"]
+        "required": ["name", "email", "password", "birth_date", "gender", "cityPlace", "showBirthDate"]
       },
       "LoginRequest": {
         "type": "object",

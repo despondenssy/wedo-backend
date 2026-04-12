@@ -26,10 +26,11 @@ class PrivacySerializer(serializers.Serializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     cityPlace = CityPlaceSerializer()
+    showBirthDate = serializers.BooleanField(source='show_birth_date')
 
     class Meta:
         model = User
-        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'cityPlace', 'interests']
+        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'cityPlace', 'interests', 'showBirthDate']
 
     def create(self, validated_data):
         city_data = validated_data.pop('cityPlace')
