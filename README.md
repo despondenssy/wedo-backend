@@ -54,6 +54,12 @@ python manage.py runserver
 
 Сервер будет доступен по адресу: `http://127.0.0.1:8000`
 
+## Swagger / OpenAPI
+
+Swagger UI доступен по адресу: `http://127.0.0.1:8000/api/docs/swagger/`
+
+OpenAPI-спецификация лежит в файле `openapi.json`.
+
 ---
 
 ## Запуск через Docker
