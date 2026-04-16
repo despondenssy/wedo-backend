@@ -92,3 +92,23 @@ class Activity(models.Model):
         if self.pref_max_participants is not None:
             prefs['maxParticipants'] = self.pref_max_participants
         return prefs if prefs else None
+
+class SavedActivity(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_activities',
+    )
+    activity = models.ForeignKey(
+        Activity,
+        on_delete=models.CASCADE,
+        related_name='saved_by',
+    )
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'saved_activities'
+        unique_together = [['user', 'activity']]
+
+    def __str__(self):
+        return f'{self.user} → {self.activity}'

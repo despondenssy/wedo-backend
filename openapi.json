@@ -866,6 +866,56 @@
         }
       }
     },
+    "/me/saved-activities": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "List saved activities",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved activities page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/saved-activities/{activity_id}": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Save activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Saved successfully" },
+          "400": {
+            "description": "Already saved",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["activities"],
+        "summary": "Unsave activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Unsaved successfully" }
+        }
+      }
+    },
     "/activities/{activity_id}/join": {
       "post": {
         "tags": ["participation"],

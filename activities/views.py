@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 
-from .models import Activity
+from .models import Activity, SavedActivity
 from .serializers import (
     ActivityListItemSerializer,
     ActivityDetailSerializer,
@@ -277,3 +277,66 @@ class RecommendedActivitiesView(APIView):
 
         max_participants = activity.pref_max_participants or 20
         return min(count / max_participants, 1.0)
+
+
+class SavedActivitiesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """GET /me/saved-activities — список сохранённых активностей."""
+        limit = min(int(request.query_params.get('limit', 30)), 50)
+        cursor = request.query_params.get('cursor')
+
+        queryset = SavedActivity.objects.filter(
+            user=request.user,
+        ).select_related('activity', 'activity__organizer').order_by('-saved_at')
+
+        if cursor:
+            queryset = queryset.filter(id__lt=cursor)
+
+        queryset = queryset[:limit + 1]
+        items = list(queryset)
+        has_more = len(items) > limit
+        if has_more:
+            items = items[:limit]
+
+        next_cursor = str(items[-1].id) if has_more else None
+        activities = [item.activity for item in items]
+
+        return Response({
+            'items': ActivityListItemSerializer(activities, many=True).data,
+            'nextCursor': next_cursor,
+            'hasMore': has_more,
+        })
+
+
+class SavedActivityDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, activity_id):
+        """POST /me/saved-activities/:id — сохранить активность."""
+        activity = get_object_or_404(Activity, id=activity_id)
+
+        _, created = SavedActivity.objects.get_or_create(
+            user=request.user,
+            activity=activity,
+        )
+
+        if not created:
+            return Response(
+                {'error': {'code': 'ALREADY_SAVED', 'message': 'Активность уже сохранена'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def delete(self, request, activity_id):
+        """DELETE /me/saved-activities/:id — убрать из сохранённых."""
+        saved = get_object_or_404(
+            SavedActivity,
+            user=request.user,
+            activity_id=activity_id,
+        )
+        saved.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
