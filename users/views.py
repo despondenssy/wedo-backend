@@ -292,3 +292,44 @@ class QrAttendanceScanView(APIView):
             'userId': str(qr_token.user.id),
             'participationStatus': participation.status,
         })
+
+
+class LogoutView(APIView):
+    """POST /auth/logout — инвалидировать refresh токен."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get('refreshToken')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RefreshTokenView(APIView):
+    """POST /auth/refresh — получить новый access токен по refresh токену."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.data.get('refreshToken')
+        if not refresh_token:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'refreshToken обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            return Response({
+                'accessToken': str(refresh.access_token),
+                'refreshToken': str(refresh),
+                'expiresAt': unix_timestamp_to_iso8601(refresh.access_token['exp']),
+            })
+        except Exception:
+            return Response(
+                {'error': {'code': 'INVALID_TOKEN', 'message': 'Недействительный или истёкший токен'}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
