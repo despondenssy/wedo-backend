@@ -204,9 +204,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
     def get_attendanceHistory(self, obj):
-        if self._is_current_user(obj) or obj.show_attendance_history:
-            return {'attended': 0, 'missed': 0}
-        return None
+        if not (self._is_current_user(obj) or obj.show_attendance_history):
+            return None
+        from participation.models import Participation
+        attended = Participation.objects.filter(
+            user=obj,
+            status='attended',
+        ).count()
+        missed = Participation.objects.filter(
+            user=obj,
+            status='missed',
+        ).count()
+        return {'attended': attended, 'missed': missed}
 
     def get_isCurrentUser(self, obj):
         return self._is_current_user(obj)
