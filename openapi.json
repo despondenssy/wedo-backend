@@ -1356,6 +1356,30 @@
         }
       }
     },
+    "/subscriptions": {
+      "post": {
+        "tags": ["subscriptions"],
+        "summary": "Create subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSubscriptionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateSubscriptionResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/subscriptions/{user_id}": {
       "patch": {
         "tags": ["subscriptions"],
