@@ -16,7 +16,12 @@ class ActivityParticipantSerializer(serializers.ModelSerializer):
     """Участник в списке участников активности."""
     user = UserSnippetSerializer()
     participationStatus = serializers.CharField(source='status')
+    joinedAt = serializers.DateTimeField(source='created_at')
+    isOrganizer = serializers.SerializerMethodField()
 
     class Meta:
         model = Participation
-        fields = ['user', 'participationStatus']
+        fields = ['user', 'participationStatus', 'joinedAt', 'isOrganizer']
+
+    def get_isOrganizer(self, obj):
+        return obj.activity.organizer_id == obj.user_id

@@ -147,9 +147,9 @@
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
-          "showBirthDate": { "type": "boolean" }
+          "privacy": { "allOf": [{ "$ref": "#/components/schemas/Privacy" }], "nullable": true }
         },
-        "required": ["name", "email", "password", "birth_date", "gender", "city", "showBirthDate"]
+        "required": ["name", "email", "password", "birth_date", "gender", "city"]
       },
       "LoginRequest": {
         "type": "object",
@@ -245,7 +245,8 @@
           "maxParticipants": { "type": "integer", "nullable": true },
           "requiresApproval": { "type": "boolean" },
           "preferences": { "allOf": [{ "$ref": "#/components/schemas/ActivityPreferences" }], "nullable": true },
-          "price": { "type": "string" }
+          "pendingRequestsCount": { "type": "integer", "nullable": true },
+          "price": { "type": "number" }
         },
         "required": ["id", "title", "startAt", "endAt", "format", "status", "location", "categoryId", "photoFileIds", "organizer", "participantsCount", "requiresApproval", "price"]
       },
@@ -257,11 +258,26 @@
             "properties": {
               "description": { "type": "string" },
               "timeZone": { "type": "string" },
-              "participantsPreview": { "type": "array", "items": {} },
+              "participantsPreview": { "type": "array", "items": { "$ref": "#/components/schemas/UserSnippet" } },
               "isSaved": { "type": "boolean" },
-              "participationStatus": { "type": "string", "nullable": true }
+              "participationStatus": { "type": "string", "nullable": true },
+              "isFull": { "type": "boolean" },
+              "spotsLeft": { "type": "integer", "nullable": true },
+              "policyFlags": {
+                "type": "object",
+                "properties": {
+                  "canJoin": { "type": "boolean" },
+                  "canLeave": { "type": "boolean" },
+                  "canCancelRequest": { "type": "boolean" },
+                  "canManageRequests": { "type": "boolean" },
+                  "canRate": { "type": "boolean" },
+                  "canEdit": { "type": "boolean" },
+                  "canCancelActivity": { "type": "boolean" }
+                },
+                "required": ["canJoin", "canLeave", "canCancelRequest", "canManageRequests", "canRate", "canEdit", "canCancelActivity"]
+              }
             },
-            "required": ["description", "timeZone", "participantsPreview", "isSaved"]
+            "required": ["description", "timeZone", "participantsPreview", "isSaved", "isFull", "policyFlags"]
           }
         ]
       },
@@ -331,9 +347,11 @@
         "type": "object",
         "properties": {
           "user": { "$ref": "#/components/schemas/UserSnippet" },
-          "participationStatus": { "type": "string" }
+          "participationStatus": { "type": "string" },
+          "joinedAt": { "type": "string", "format": "date-time" },
+          "isOrganizer": { "type": "boolean" }
         },
-        "required": ["user", "participationStatus"]
+        "required": ["user", "participationStatus", "joinedAt", "isOrganizer"]
       },
       "ActivityParticipantsResponse": {
         "type": "object",
