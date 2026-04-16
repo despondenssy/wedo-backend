@@ -23,18 +23,30 @@ class PrivacySerializer(serializers.Serializer):
     showReviews = serializers.BooleanField()
 
 
+class PrivacyRegisterSerializer(serializers.Serializer):
+    """Privacy настройки при регистрации — все поля опциональны."""
+    showAvatar = serializers.BooleanField(required=False, default=True)
+    showGender = serializers.BooleanField(required=False, default=True)
+    showCity = serializers.BooleanField(required=False, default=True)
+    showInterests = serializers.BooleanField(required=False, default=True)
+    showBirthDate = serializers.BooleanField(required=False, default=False)
+    showAttendanceHistory = serializers.BooleanField(required=False, default=True)
+    showReviews = serializers.BooleanField(required=False, default=True)
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     city = CitySerializer()
-    showBirthDate = serializers.BooleanField(source='show_birth_date')
+    privacy = PrivacyRegisterSerializer(required=False)
 
     class Meta:
         model = User
-        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'showBirthDate']
+        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'privacy']
 
     def create(self, validated_data):
         city_data = validated_data.pop('city')
         password = validated_data.pop('password')
+        privacy_data = validated_data.pop('privacy', {})
 
         user = User(
             city_settlement=city_data['settlement'],
@@ -46,6 +58,16 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         user.set_password(password)
+
+        if privacy_data:
+            user.show_avatar = privacy_data.get('showAvatar', True)
+            user.show_gender = privacy_data.get('showGender', True)
+            user.show_city = privacy_data.get('showCity', True)
+            user.show_interests = privacy_data.get('showInterests', True)
+            user.show_birth_date = privacy_data.get('showBirthDate', False)
+            user.show_attendance_history = privacy_data.get('showAttendanceHistory', True)
+            user.show_reviews = privacy_data.get('showReviews', True)
+
         user.save()
         return user
 
@@ -177,7 +199,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
     def get_privacy(self, obj):
-        # privacy видит только сам пользователь
         if self._is_current_user(obj):
             return obj.privacy
         return None
@@ -207,7 +228,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return None
 
         from ratings.models import ActivityRating
-        # берём последние 3 отзыва на активности где obj был организатором
         ratings = ActivityRating.objects.filter(
             activity__organizer=obj,
             comment__isnull=False,
@@ -225,6 +245,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             }
             for r in ratings
         ]
+
 
 class UserSnippetSerializer(serializers.ModelSerializer):
     """Компактный профиль для вложений — карточки активностей, списки участников."""
