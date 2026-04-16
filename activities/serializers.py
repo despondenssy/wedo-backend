@@ -36,16 +36,18 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
     requiresApproval = serializers.BooleanField(source='requires_approval')
     photoFileIds = serializers.JSONField(source='photo_file_ids')
     participantsCount = serializers.SerializerMethodField()
+    pendingRequestsCount = serializers.SerializerMethodField()
     maxParticipants = serializers.SerializerMethodField()
     coverPhotoFileId = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
         fields = [
             'id', 'title', 'startAt', 'endAt', 'format', 'status',
             'location', 'categoryId', 'subcategoryId', 'coverPhotoFileId',
-            'photoFileIds', 'organizer', 'participantsCount', 'maxParticipants',
-            'requiresApproval', 'preferences', 'price',
+            'photoFileIds', 'organizer', 'participantsCount', 'pendingRequestsCount',
+            'maxParticipants', 'requiresApproval', 'preferences', 'price',
         ]
 
     def get_location(self, obj):
@@ -55,15 +57,28 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
         return obj.preferences
 
     def get_participantsCount(self, obj):
-        # будет считаться из participation когда сделаем тот модуль
-        return 0
+        from participation.models import Participation
+        return Participation.objects.filter(
+            activity=obj,
+            status__in=['accepted', 'attended'],
+        ).count()
+
+    def get_pendingRequestsCount(self, obj):
+        from participation.models import Participation
+        return Participation.objects.filter(
+            activity=obj,
+            status='pending',
+        ).count()
 
     def get_maxParticipants(self, obj):
         return obj.pref_max_participants
 
     def get_coverPhotoFileId(self, obj):
-        # первое фото как обложка
         return obj.photo_file_ids[0] if obj.photo_file_ids else None
+
+    def get_price(self, obj):
+        # возвращаем как число а не строку
+        return float(obj.price)
 
 
 class ActivityDetailSerializer(ActivityListItemSerializer):
@@ -72,24 +87,104 @@ class ActivityDetailSerializer(ActivityListItemSerializer):
     participantsPreview = serializers.SerializerMethodField()
     isSaved = serializers.SerializerMethodField()
     participationStatus = serializers.SerializerMethodField()
+    isFull = serializers.SerializerMethodField()
+    spotsLeft = serializers.SerializerMethodField()
+    policyFlags = serializers.SerializerMethodField()
 
     class Meta(ActivityListItemSerializer.Meta):
         fields = ActivityListItemSerializer.Meta.fields + [
             'description', 'timeZone', 'participantsPreview',
-            'isSaved', 'participationStatus',
+            'isSaved', 'participationStatus', 'isFull', 'spotsLeft', 'policyFlags',
         ]
 
     def get_participantsPreview(self, obj):
-        # заполним когда будет participation
-        return []
+        from participation.models import Participation
+        participations = Participation.objects.filter(
+            activity=obj,
+            status__in=['accepted', 'attended'],
+        ).select_related('user')[:5]
+        return UserSnippetSerializer([p.user for p in participations], many=True).data
 
     def get_isSaved(self, obj):
-        # заполним когда будет saved activities
-        return False
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        from .models import SavedActivity
+        return SavedActivity.objects.filter(
+            user=request.user,
+            activity=obj,
+        ).exists()
 
     def get_participationStatus(self, obj):
-        # заполним когда будет participation
-        return None
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        from participation.models import Participation
+        try:
+            p = Participation.objects.get(activity=obj, user=request.user)
+            return p.status
+        except Participation.DoesNotExist:
+            return None
+
+    def get_isFull(self, obj):
+        if not obj.pref_max_participants:
+            return False
+        count = self.get_participantsCount(obj)
+        return count >= obj.pref_max_participants
+
+    def get_spotsLeft(self, obj):
+        if not obj.pref_max_participants:
+            return None
+        count = self.get_participantsCount(obj)
+        return max(0, obj.pref_max_participants - count)
+
+    def get_policyFlags(self, obj):
+        """Флаги что пользователь может делать с этой активностью."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return {
+                'canJoin': False,
+                'canLeave': False,
+                'canCancelRequest': False,
+                'canManageRequests': False,
+                'canRate': False,
+                'canEdit': False,
+                'canCancelActivity': False,
+            }
+
+        user = request.user
+        is_organizer = obj.organizer_id == user.id
+        is_active = obj.status == Activity.Status.ACTIVE
+
+        from participation.models import Participation
+        participation_status = None
+        try:
+            p = Participation.objects.get(activity=obj, user=user)
+            participation_status = p.status
+        except Participation.DoesNotExist:
+            pass
+
+        is_participant = participation_status in ['accepted', 'attended']
+        is_pending = participation_status == 'pending'
+        is_full = self.get_isFull(obj)
+        has_attended = participation_status == 'attended'
+
+        return {
+            # вступить можно если активен, не организатор, не участник, не заполнен
+            'canJoin': is_active and not is_organizer and not is_participant and not is_pending and not is_full,
+            # выйти можно если участник и активность ещё активна
+            'canLeave': is_active and is_participant and not is_organizer,
+            # отменить заявку можно если заявка pending
+            'canCancelRequest': is_pending,
+            # управлять заявками может только организатор
+            'canManageRequests': is_organizer and is_active,
+            # оценить можно если посетил активность
+            'canRate': has_attended and not is_organizer,
+            # редактировать может только организатор пока активность активна
+            'canEdit': is_organizer and is_active,
+            # отменить активность может только организатор
+            'canCancelActivity': is_organizer and is_active,
+        }
 
 
 class CreateActivitySerializer(serializers.ModelSerializer):
