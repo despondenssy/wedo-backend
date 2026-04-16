@@ -34,6 +34,7 @@ class ActivityListView(APIView):
         age_to = request.query_params.get('ageTo')
         requires_approval = request.query_params.get('requiresApproval')
         only_available = request.query_params.get('onlyAvailable')
+        price_to = request.query_params.get('priceTo')
 
         if category_id:
             queryset = queryset.filter(category_id=category_id)
@@ -41,8 +42,19 @@ class ActivityListView(APIView):
             queryset = queryset.filter(subcategory_id=subcategory_id)
         if format_:
             queryset = queryset.filter(format=format_)
-        if city:
-            queryset = queryset.filter(location_settlement__icontains=city)
+
+        # трёхуровневая геолокация: city содержит settlement, region, country
+        city_settlement = request.query_params.get('citySettlement') or city
+        city_region = request.query_params.get('cityRegion')
+        city_country = request.query_params.get('cityCountry')
+
+        if city_settlement:
+            queryset = queryset.filter(location_settlement__icontains=city_settlement)
+        if city_region:
+            queryset = queryset.filter(location_region__icontains=city_region)
+        if city_country:
+            queryset = queryset.filter(location_country__icontains=city_country)
+
         if date_from:
             queryset = queryset.filter(start_at__date__gte=date_from)
         if date_to:
@@ -57,6 +69,8 @@ class ActivityListView(APIView):
             queryset = queryset.filter(pref_age_to__lte=age_to)
         if requires_approval is not None:
             queryset = queryset.filter(requires_approval=requires_approval == 'true')
+        if price_to:
+            queryset = queryset.filter(price__lte=price_to)
 
         # простая cursor pagination по id
         cursor = request.query_params.get('cursor')
@@ -151,13 +165,48 @@ class RecommendedActivitiesView(APIView):
             start_at__gte=now,
         ).select_related('organizer').prefetch_related('participations')
 
+        # предварительная фильтрация по городу-региону-стране пользователя
+        if user.city_settlement:
+            queryset = queryset.filter(
+                location_settlement__icontains=user.city_settlement
+            )
+        if user.city_region:
+            queryset = queryset.filter(
+                location_region__icontains=user.city_region
+            )
+        if user.city_country:
+            queryset = queryset.filter(
+                location_country__icontains=user.city_country
+            )
+
+        # исключаем события к которым пользователь уже присоединился или организовал
+        from participation.models import Participation
+        already_joined = Participation.objects.filter(
+            user=user,
+            status__in=['pending', 'accepted', 'attended'],
+        ).values_list('activity_id', flat=True)
+        queryset = queryset.exclude(id__in=already_joined).exclude(organizer=user)
+
         cursor = request.query_params.get('cursor')
         if cursor:
             queryset = queryset.filter(id__lt=cursor)
 
-        # берём больше чтобы после scoring отдать нужное количество
         limit = min(int(request.query_params.get('limit', 30)), 50)
         candidates = list(queryset[:limit * 3])
+
+        if not candidates:
+            return Response({'items': [], 'nextCursor': None, 'hasMore': False})
+
+        # считаем n_max для формулы P(e) = n(e) / n_max
+        from participation.models import Participation
+        counts = {
+            a.id: Participation.objects.filter(
+                activity=a,
+                status__in=['pending', 'accepted', 'attended'],
+            ).count()
+            for a in candidates
+        }
+        self._n_max = max(counts.values()) if counts else 1
 
         scored = []
         for activity in candidates:
@@ -192,13 +241,17 @@ class RecommendedActivitiesView(APIView):
         )
 
     def _interests_score(self, activity, user):
-        """1.0 если категория совпадает с интересами пользователя, иначе 0."""
+        """I(e,u): 1.0 если подкатегория в интересах, 0.5 если только категория, иначе 0."""
         if not user.interests:
             return 0.0
-        return 1.0 if activity.category_id in user.interests else 0.0
+        if activity.subcategory_id and activity.subcategory_id in user.interests:
+            return 1.0
+        if activity.category_id in user.interests:
+            return 0.5
+        return 0.0
 
     def _subscription_score(self, activity, user):
-        """1.0 если пользователь подписан на организатора."""
+        """S(e,u): 1.0 если пользователь подписан на организатора, иначе 0."""
         from subscriptions.models import Subscription
         return 1.0 if Subscription.objects.filter(
             follower=user,
@@ -206,77 +259,87 @@ class RecommendedActivitiesView(APIView):
         ).exists() else 0.0
 
     def _geo_score(self, activity, user):
-        """1.0 если город совпадает, 0.5 если нет координат, 0.0 если разные города."""
-        if not user.city_settlement or not activity.location_settlement:
-            return 0.5
-        if user.city_settlement.lower() == activity.location_settlement.lower():
-            return 1.0
-        # если есть координаты — считаем расстояние
-        if user.city_latitude and user.city_longitude:
-            return self._distance_score(
-                user.city_latitude, user.city_longitude,
-                activity.location_latitude, activity.location_longitude,
-            )
-        return 0.0
+        """
+        G(e,u) = max(0, 1 - d(u,e) / d_max).
+        Расстояние считается по формуле гаверсинусов. d_max = 200 км.
+        """
+        if not user.city_latitude or not user.city_longitude:
+            return 0.0
+        if not activity.location_latitude or not activity.location_longitude:
+            return 0.0
 
-    def _distance_score(self, lat1, lon1, lat2, lon2):
-        """Чем ближе — тем выше score. До 50км = 1.0, до 200км = 0.5, дальше = 0.0."""
+        d = self._haversine(
+            user.city_latitude, user.city_longitude,
+            activity.location_latitude, activity.location_longitude,
+        )
+        d_max = 200.0
+        return max(0.0, 1.0 - d / d_max)
+
+    def _haversine(self, lat1, lon1, lat2, lon2):
+        """Формула гаверсинусов для расчёта расстояния по поверхности Земли."""
         import math
         R = 6371
-        dlat = math.radians(lat2 - lat1)
-        dlon = math.radians(lon2 - lon1)
-        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-        distance_km = R * 2 * math.asin(math.sqrt(a))
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
 
-        if distance_km <= 50:
-            return 1.0
-        elif distance_km <= 200:
-            return 0.5
-        return 0.0
+        a = (math.sin(delta_phi / 2) ** 2 +
+            math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2)
+
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     def _similar_users_score(self, activity, user):
         """
-        Похожие пользователи — те у кого пересекаются интересы с текущим.
-        Если они участвуют в активности, score растёт.
+        B(e,u) = (1 / |N_u|) * sum(y_v_e для v в N_u).
+        y_v_e = 1 если пользователь v подал заявку на событие e, иначе 0.
+        N_u — пользователи с пересекающимися интересами.
         """
         from participation.models import Participation
         from django.contrib.auth import get_user_model
+        from django.db.models import Q
         User = get_user_model()
 
         if not user.interests:
             return 0.0
 
-        # для JSONField используем contains для каждого интереса
-        from django.db.models import Q
         query = Q()
         for interest in user.interests:
             query |= Q(interests__contains=[interest])
 
-        similar_user_ids = User.objects.filter(query).exclude(
-            id=user.id
-        ).values_list('id', flat=True)[:50]
+        similar_user_ids = list(
+            User.objects.filter(query).exclude(id=user.id).values_list('id', flat=True)[:50]
+        )
 
         if not similar_user_ids:
             return 0.0
 
+        n_u = len(similar_user_ids)
+
         participants_count = Participation.objects.filter(
             activity=activity,
             user_id__in=similar_user_ids,
-            status__in=['accepted', 'attended'],
+            status__in=['pending', 'accepted', 'attended'],
         ).count()
 
-        return min(participants_count / 5, 1.0)
+        return participants_count / n_u
 
     def _popularity_score(self, activity):
-        """Популярность по количеству участников относительно максимума."""
+        """
+        P(e) = n(e) / n_max.
+        n(e) — количество заявок на событие e.
+        n_max — максимальное количество заявок среди всех рассматриваемых событий.
+        """
         from participation.models import Participation
         count = Participation.objects.filter(
             activity=activity,
-            status__in=['accepted', 'attended'],
+            status__in=['pending', 'accepted', 'attended'],
         ).count()
 
-        max_participants = activity.pref_max_participants or 20
-        return min(count / max_participants, 1.0)
+        n_max = getattr(self, '_n_max', None)
+        if not n_max:
+            return 0.0
+        return count / n_max
 
 
 class SavedActivitiesView(APIView):

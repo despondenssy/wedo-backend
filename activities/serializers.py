@@ -9,7 +9,8 @@ class LocationSerializer(serializers.Serializer):
     address = serializers.CharField()
     name = serializers.CharField(required=False, allow_null=True)
     settlement = serializers.CharField(required=False, allow_null=True)
-
+    region = serializers.CharField(required=False, allow_null=True)
+    country = serializers.CharField(required=False, allow_null=True)
 
 class PreferencesSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(
@@ -218,6 +219,8 @@ class CreateActivitySerializer(serializers.ModelSerializer):
             location_address=location_data['address'],
             location_name=location_data.get('name'),
             location_settlement=location_data.get('settlement'),
+            location_region=location_data.get('region'),
+            location_country=location_data.get('country'),
             **validated_data
         )
 
@@ -260,6 +263,8 @@ class UpdateActivitySerializer(serializers.ModelSerializer):
             instance.location_address = location_data['address']
             instance.location_name = location_data.get('name')
             instance.location_settlement = location_data.get('settlement')
+            instance.location_region = location_data.get('region')
+            instance.location_country = location_data.get('country')
 
         if preferences_data:
             instance.pref_gender = preferences_data.get('gender', instance.pref_gender)

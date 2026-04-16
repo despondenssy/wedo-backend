@@ -44,7 +44,6 @@ class ActivityRatingsView(APIView):
     def post(self, request, activity_id):
         activity = get_object_or_404(Activity, id=activity_id)
 
-        # только посетивший активность может оставить оценку
         has_attended = Participation.objects.filter(
             activity=activity,
             user=request.user,
@@ -74,15 +73,69 @@ class ActivityRatingsView(APIView):
 
         rating = serializer.save(activity=activity, user=request.user)
 
-        # пересчитываем рейтинг организатора
-        organizer = activity.organizer
-        avg = ActivityRating.objects.filter(
-            activity__organizer=organizer,
-        ).aggregate(avg=Avg('rating'))['avg']
-        organizer.rating = round(avg, 2) if avg else 0.0
-        organizer.save(update_fields=['rating'])
+        self._recalculate_organizer_rating(activity.organizer)
 
         return Response(
             ActivityRatingSerializer(rating).data,
             status=status.HTTP_201_CREATED,
         )
+
+    def _recalculate_organizer_rating(self, organizer):
+        """
+        R(o) = (v_w * M_w(o) + m * C) / (v_w + m)
+        где v_w = sum(lambda(t_i)) — эффективное взвешенное число оценок,
+        M_w(o) = sum(lambda(t_i) * r_i) / sum(lambda(t_i)) — взвешенное среднее,
+        C — среднее по платформе,
+        m — параметр сглаживания.
+        """
+        import math
+        from django.utils import timezone
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        # параметры модели
+        alpha = 0.01  # скорость затухания: оценка теряет половину веса за ~70 дней
+        m = 5         # минимальное доверенное число оценок
+
+        now = timezone.now()
+
+        # все оценки организатора
+        ratings = ActivityRating.objects.filter(
+            activity__organizer=organizer,
+        ).values('rating', 'created_at')
+
+        if not ratings:
+            organizer.rating = 0.0
+            organizer.save(update_fields=['rating'])
+            return
+
+        # считаем взвешенные суммы с учётом временного затухания
+        weighted_sum = 0.0
+        weight_total = 0.0
+
+        for r in ratings:
+            delta_t = (now - r['created_at']).days
+            lam = math.exp(-alpha * delta_t)  # λ(t_i) = e^(-α * Δt_i)
+            weighted_sum += lam * r['rating']
+            weight_total += lam
+
+        # v_w = sum(lambda(t_i))
+        v_w = weight_total
+
+        # M_w(o) = sum(lambda * r) / sum(lambda)
+        m_w = weighted_sum / weight_total if weight_total > 0 else 0.0
+
+        # C — среднее по платформе (среднее всех рейтингов всех организаторов)
+        all_ratings = ActivityRating.objects.all()
+        if all_ratings.exists():
+            from django.db.models import Avg
+            c = all_ratings.aggregate(avg=Avg('rating'))['avg'] or 0.0
+        else:
+            c = 0.0
+
+        # R(o) = (v_w * M_w(o) + m * C) / (v_w + m)
+        r_final = (v_w * m_w + m * c) / (v_w + m)
+
+        organizer.rating = round(r_final, 2)
+        organizer.save(update_fields=['rating'])

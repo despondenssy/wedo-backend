@@ -39,6 +39,8 @@ class Activity(models.Model):
     location_address = models.CharField(max_length=500)
     location_name = models.CharField(max_length=255, blank=True, null=True)
     location_settlement = models.CharField(max_length=255, blank=True, null=True)
+    location_region = models.CharField(max_length=255, blank=True, null=True)
+    location_country = models.CharField(max_length=255, blank=True, null=True)
 
     start_at = models.DateTimeField()
     end_at = models.DateTimeField()
@@ -76,6 +78,8 @@ class Activity(models.Model):
             'address': self.location_address,
             'name': self.location_name,
             'settlement': self.location_settlement,
+            'region': self.location_region,
+            'country': self.location_country,
         }
 
     @property
