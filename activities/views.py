@@ -291,9 +291,10 @@ class RecommendedActivitiesView(APIView):
 
     def _similar_users_score(self, activity, user):
         """
-        B(e,u) = (1 / |N_u|) * sum(y_v_e для v в N_u).
-        y_v_e = 1 если пользователь v подал заявку на событие e, иначе 0.
-        N_u — пользователи с пересекающимися интересами.
+        B(e,u) = (1/|N_u|) * sum(J(u,v) * y_v_e для v в N_u).
+        J(u,v) = |interests_u ∩ interests_v| / |interests_u ∪ interests_v|
+        y_v_e = 1 если v участвует в событии e, иначе 0.
+        N_u — пользователи с хотя бы одним общим интересом.
         """
         from participation.models import Participation
         from django.contrib.auth import get_user_model
@@ -303,26 +304,45 @@ class RecommendedActivitiesView(APIView):
         if not user.interests:
             return 0.0
 
+        user_interests = set(user.interests)
+
         query = Q()
         for interest in user.interests:
             query |= Q(interests__contains=[interest])
 
-        similar_user_ids = list(
-            User.objects.filter(query).exclude(id=user.id).values_list('id', flat=True)[:50]
+        similar_users = list(
+            User.objects.filter(query).exclude(id=user.id)[:50]
         )
 
-        if not similar_user_ids:
+        if not similar_users:
             return 0.0
 
-        n_u = len(similar_user_ids)
+        # участники этой активности
+        participant_ids = set(
+            Participation.objects.filter(
+                activity=activity,
+                status__in=['pending', 'accepted', 'attended'],
+            ).values_list('user_id', flat=True)
+        )
 
-        participants_count = Participation.objects.filter(
-            activity=activity,
-            user_id__in=similar_user_ids,
-            status__in=['pending', 'accepted', 'attended'],
-        ).count()
+        weighted_sum = 0.0
+        for v in similar_users:
+            if not v.interests:
+                continue
+            v_interests = set(v.interests)
 
-        return participants_count / n_u
+            # J(u,v) = |A ∩ B| / |A ∪ B|
+            intersection = len(user_interests & v_interests)
+            union = len(user_interests | v_interests)
+            jaccard = intersection / union if union > 0 else 0.0
+
+            # y_v_e = 1 если v участвует, иначе 0
+            y_v_e = 1 if v.id in participant_ids else 0
+
+            weighted_sum += jaccard * y_v_e
+
+        n_u = len(similar_users)
+        return weighted_sum / n_u
 
     def _popularity_score(self, activity):
         """
