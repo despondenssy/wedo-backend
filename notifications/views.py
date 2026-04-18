@@ -109,3 +109,24 @@ class NotificationsUnreadCountView(APIView):
         ).count()
 
         return Response({'count': count})
+
+
+class DeviceTokenView(APIView):
+    """POST /me/device-token — сохранить FCM токен устройства."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'token обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from notifications.models import DeviceToken
+        DeviceToken.objects.update_or_create(
+            token=token,
+            defaults={'user': request.user},
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

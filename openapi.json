@@ -744,6 +744,37 @@
         }
       }
     },
+    "/me/device-token": {
+      "post": {
+        "tags": ["notifications"],
+        "summary": "Register FCM device token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": { "type": "string" }
+                },
+                "required": ["token"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Token saved successfully" },
+          "400": {
+            "description": "Token missing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/{user_id}": {
       "get": {
         "tags": ["users"],

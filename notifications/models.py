@@ -48,3 +48,20 @@ class Notification(models.Model):
     @property
     def is_read(self):
         return self.read_at is not None
+
+
+class DeviceToken(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='device_tokens',
+    )
+    token = models.TextField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'device_tokens'
+
+    def __str__(self):
+        return f'{self.user} — {self.token[:20]}...'
