@@ -65,10 +65,7 @@ class NotificationDetailView(APIView):
 
         notification.save()
 
-        return Response({
-            'id': str(notification.id),
-            'read': notification.is_read,
-        })
+        return Response(NotificationSerializer(notification).data)
 
     def delete(self, request, notification_id):
         notification = get_object_or_404(
@@ -78,10 +75,7 @@ class NotificationDetailView(APIView):
         )
         notification.delete()
 
-        return Response({
-            'id': str(notification_id),
-            'deleted': True,
-        })
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class NotificationsReadAllView(APIView):

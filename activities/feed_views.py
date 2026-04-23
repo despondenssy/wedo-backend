@@ -7,7 +7,6 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from .models import Activity, UserActivityFeedEvent
-from .serializers import ActivityListItemSerializer
 
 User = get_user_model()
 
@@ -127,11 +126,11 @@ class ActivityFeedEventCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user_id = request.data.get('userId')
-        activity_id = request.data.get('activityId')
+        user_id = request.data.get('user_id')
+        activity_id = request.data.get('activity_id')
         event_type = request.data.get('type')
-        occurred_at = request.data.get('occurredAt')
-        actor_user_id = request.data.get('actorUserId')
+        occurred_at = request.data.get('occurred_at')
+        actor_user_id = request.data.get('actor_user_id')
         metadata = request.data.get('metadata', {})
 
         if not all([user_id, activity_id, event_type]):

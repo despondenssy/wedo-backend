@@ -306,7 +306,7 @@ class ActivityAttendanceView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        user_id = request.data.get('userId')
+        user_id = request.data.get('user_id')
         if not user_id:
             return Response(
                 {'error': {'code': 'BAD_REQUEST', 'message': 'userId обязателен'}},

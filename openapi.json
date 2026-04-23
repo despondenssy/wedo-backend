@@ -401,14 +401,6 @@
           "read": { "type": "boolean" }
         }
       },
-      "NotificationReadResponse": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "read": { "type": "boolean" }
-        },
-        "required": ["id", "read"]
-      },
       "NotificationDeleteResponse": {
         "type": "object",
         "properties": {
@@ -1403,7 +1395,7 @@
             "description": "Updated notification state",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/NotificationReadResponse" }
+                "schema": { "$ref": "#/components/schemas/Notification" }
               }
             }
           }
@@ -1416,13 +1408,8 @@
           { "name": "notification_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Deleted notification",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/NotificationDeleteResponse" }
-              }
-            }
+          "204": {
+            "description": "Notification deleted"
           }
         }
       }

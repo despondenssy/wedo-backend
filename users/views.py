@@ -294,11 +294,7 @@ class QrAttendanceScanView(APIView):
         qr_token.used_at = timezone.now()
         qr_token.save()
 
-        return Response({
-            'activityId': str(activity_id),
-            'userId': str(qr_token.user.id),
-            'participationStatus': participation.status,
-        })
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MyActivitiesView(APIView):
@@ -335,7 +331,7 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.data.get('refreshToken')
+        refresh_token = request.data.get('refresh_token')
         if refresh_token:
             try:
                 token = RefreshToken(refresh_token)
@@ -350,7 +346,7 @@ class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        refresh_token = request.data.get('refreshToken')
+        refresh_token = request.data.get('refresh_token')
         if not refresh_token:
             return Response(
                 {'error': {'code': 'BAD_REQUEST', 'message': 'refreshToken обязателен'}},
