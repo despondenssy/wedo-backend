@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from activities.models import Activity
 from .models import Participation
-from .serializers import ParticipationStatusSerializer, ActivityParticipantSerializer
+from .serializers import ActivityParticipantSerializer, ActivityJoinRequestSerializer
 
 
 def _send_notification(user, notification_type, title, message, activity, request_user=None):
@@ -50,7 +50,6 @@ class ActivityJoinView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # проверяем лимит участников
         if activity.pref_max_participants:
             accepted_count = activity.participations.filter(
                 status__in=[Participation.Status.ACCEPTED, Participation.Status.ATTENDED]
@@ -77,7 +76,7 @@ class ActivityJoinView(APIView):
             participation.status = Participation.Status.ACCEPTED
             participation.save()
 
-        return Response(ParticipationStatusSerializer(participation).data)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityJoinRequestView(APIView):
@@ -105,7 +104,6 @@ class ActivityJoinRequestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # уведомляем организатора о новой заявке
         _send_notification(
             user=activity.organizer,
             notification_type='request',
@@ -115,7 +113,7 @@ class ActivityJoinRequestView(APIView):
             request_user=request.user,
         )
 
-        return Response(ParticipationStatusSerializer(participation).data)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityJoinRequestCancelView(APIView):
@@ -130,9 +128,7 @@ class ActivityJoinRequestCancelView(APIView):
             status=Participation.Status.PENDING,
         )
         participation.delete()
-
-        # возвращаем null статус как в контракте
-        return Response({'activityId': str(activity_id), 'participationStatus': None})
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityLeaveView(APIView):
@@ -147,8 +143,7 @@ class ActivityLeaveView(APIView):
             status=Participation.Status.ACCEPTED,
         )
         participation.delete()
-
-        return Response({'activityId': str(activity_id), 'participationStatus': None})
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityJoinRequestApproveView(APIView):
@@ -173,7 +168,6 @@ class ActivityJoinRequestApproveView(APIView):
         participation.status = Participation.Status.ACCEPTED
         participation.save()
 
-        # уведомляем участника об одобрении
         _send_notification(
             user=participation.user,
             notification_type='request_approved',
@@ -183,11 +177,7 @@ class ActivityJoinRequestApproveView(APIView):
             request_user=request.user,
         )
 
-        return Response({
-            'activityId': str(activity_id),
-            'userId': str(user_id),
-            'participationStatus': participation.status,
-        })
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityJoinRequestRejectView(APIView):
@@ -212,7 +202,6 @@ class ActivityJoinRequestRejectView(APIView):
         participation.status = Participation.Status.REJECTED
         participation.save()
 
-        # уведомляем участника об отклонении
         _send_notification(
             user=participation.user,
             notification_type='request_rejected',
@@ -222,11 +211,7 @@ class ActivityJoinRequestRejectView(APIView):
             request_user=request.user,
         )
 
-        return Response({
-            'activityId': str(activity_id),
-            'userId': str(user_id),
-            'participationStatus': participation.status,
-        })
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityParticipantsView(APIView):
@@ -295,7 +280,7 @@ class ActivityJoinRequestsView(APIView):
         next_cursor = str(items[-1].id) if has_more else None
 
         return Response({
-            'items': ActivityParticipantSerializer(items, many=True).data,
+            'items': ActivityJoinRequestSerializer(items, many=True).data,
             'nextCursor': next_cursor,
             'hasMore': has_more,
         })
@@ -331,8 +316,4 @@ class ActivityAttendanceView(APIView):
         participation.attendance_marked_at = timezone.now()
         participation.save()
 
-        return Response({
-            'activityId': str(activity_id),
-            'userId': str(user_id),
-            'participationStatus': participation.status,
-        })
+        return Response(status=status.HTTP_204_NO_CONTENT)

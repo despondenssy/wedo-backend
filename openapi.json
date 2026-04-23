@@ -326,23 +326,6 @@
           "status": { "type": "string", "enum": ["active", "cancelled"] }
         }
       },
-      "ParticipationStatus": {
-        "type": "object",
-        "properties": {
-          "activityId": { "type": "string" },
-          "participationStatus": { "type": "string", "nullable": true }
-        },
-        "required": ["activityId"]
-      },
-      "ParticipationDecision": {
-        "type": "object",
-        "properties": {
-          "activityId": { "type": "string" },
-          "userId": { "type": "string" },
-          "participationStatus": { "type": "string" }
-        },
-        "required": ["activityId", "userId", "participationStatus"]
-      },
       "ActivityParticipant": {
         "type": "object",
         "properties": {
@@ -357,6 +340,24 @@
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityParticipant" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "ActivityJoinRequest": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/UserSnippet" },
+          "participationStatus": { "type": "string" },
+          "requestCreatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["user", "participationStatus", "requestCreatedAt"]
+      },
+      "ActivityJoinRequestsResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityJoinRequest" } },
           "nextCursor": { "type": "string", "nullable": true },
           "hasMore": { "type": "boolean" }
         },
@@ -415,21 +416,6 @@
           "deleted": { "type": "boolean" }
         },
         "required": ["id", "deleted"]
-      },
-      "ReadAllNotificationsResponse": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "updatedCount": { "type": "integer" }
-        },
-        "required": ["success", "updatedCount"]
-      },
-      "UnreadCountResponse": {
-        "type": "object",
-        "properties": {
-          "count": { "type": "integer" }
-        },
-        "required": ["count"]
       },
       "ActivityRating": {
         "type": "object",
@@ -702,6 +688,13 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": ["users"],
+        "summary": "Delete current user account",
+        "responses": {
+          "204": { "description": "Account deleted" }
+        }
       }
     },
     "/me/privacy": {
@@ -738,6 +731,27 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/QrTokenResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/my-activities": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get my activities",
+        "parameters": [
+          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "upcoming", "attended"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "My activities page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
               }
             }
           }
@@ -810,6 +824,49 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/rating": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user rating",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "User rating",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rating": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/attendance-history": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user attendance history",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attendance history",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AttendanceHistory" }
               }
             }
           }
@@ -1034,18 +1091,30 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Participation status",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
     "/activities/{activity_id}/join-requests": {
+      "get": {
+        "tags": ["participation"],
+        "summary": "List join requests",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Join requests page",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityJoinRequestsResponse" }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": ["participation"],
         "summary": "Create join request",
@@ -1053,14 +1122,7 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Participation status",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1072,14 +1134,7 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Reset participation status",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1092,14 +1147,7 @@
           { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Participation decision",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1112,14 +1160,7 @@
           { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Participation decision",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1152,14 +1193,7 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "200": {
-            "description": "Reset participation status",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationStatus" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1179,14 +1213,7 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Participation decision",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1206,14 +1233,7 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Participation decision",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ParticipationDecision" }
-              }
-            }
-          }
+          "204": { "description": "Success" }
         }
       }
     },
@@ -1288,30 +1308,7 @@
         "tags": ["notifications"],
         "summary": "Mark all notifications as read",
         "responses": {
-          "200": {
-            "description": "Bulk update result",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ReadAllNotificationsResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/notifications/unread-count": {
-      "get": {
-        "tags": ["notifications"],
-        "summary": "Get unread notifications count",
-        "responses": {
-          "200": {
-            "description": "Unread count",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UnreadCountResponse" }
-              }
-            }
-          }
+          "204": { "description": "All notifications marked as read" }
         }
       }
     },

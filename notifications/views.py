@@ -93,22 +93,7 @@ class NotificationsReadAllView(APIView):
             read_at__isnull=True,
         ).update(read_at=timezone.now())
 
-        return Response({
-            'success': True,
-            'updatedCount': updated_count,
-        })
-
-
-class NotificationsUnreadCountView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        count = Notification.objects.filter(
-            user=request.user,
-            read_at__isnull=True,
-        ).count()
-
-        return Response({'count': count})
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DeviceTokenView(APIView):

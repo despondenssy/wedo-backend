@@ -93,6 +93,13 @@ class MeView(APIView):
         user = serializer.save()
         return Response(UserProfileSerializer(user, context={'request': request}).data)
 
+    def delete(self, request):
+        user = request.user
+        user.deleted_at = timezone.now()
+        user.is_active = False
+        user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class MePrivacyView(APIView):
     permission_classes = [IsAuthenticated]
@@ -292,6 +299,35 @@ class QrAttendanceScanView(APIView):
             'userId': str(qr_token.user.id),
             'participationStatus': participation.status,
         })
+
+
+class MyActivitiesView(APIView):
+    """GET /me/my-activities — мои активности."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return UserHistoryView().get(request, user_id=request.user.id)
+
+
+class UserRatingView(APIView):
+    """GET /users/:id/rating — рейтинг пользователя."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
+        return Response({'rating': user.rating})
+
+
+class UserAttendanceHistoryView(APIView):
+    """GET /users/:id/attendance-history — история посещений."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
+        from participation.models import Participation
+        attended = Participation.objects.filter(user=user, status='attended').count()
+        missed = Participation.objects.filter(user=user, status='missed').count()
+        return Response({'attended': attended, 'missed': missed})
 
 
 class LogoutView(APIView):
