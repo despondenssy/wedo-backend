@@ -518,6 +518,41 @@
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/File" } }
         },
         "required": ["items"]
+      },
+      "UserActivityFeedEvent": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "activityId": { "type": "string" },
+          "type": { "type": "string", "enum": ["created", "attended", "rated", "cancelled", "leaved", "joined", "missed"] },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "actorUserId": { "type": "string", "nullable": true },
+          "metadata": { "type": "object" }
+        },
+        "required": ["id", "userId", "activityId", "type", "occurredAt", "createdAt"]
+      },
+      "UserActivityFeedResponse": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/UserActivityFeedEvent" } },
+          "nextCursor": { "type": "string", "nullable": true },
+          "hasMore": { "type": "boolean" }
+        },
+        "required": ["items", "hasMore"]
+      },
+      "CreateUserActivityFeedEventRequest": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "activityId": { "type": "string" },
+          "type": { "type": "string", "enum": ["created", "attended", "rated", "cancelled", "leaved", "joined", "missed"] },
+          "occurredAt": { "type": "string", "format": "date-time", "nullable": true },
+          "actorUserId": { "type": "string", "nullable": true },
+          "metadata": { "type": "object", "nullable": true }
+        },
+        "required": ["userId", "activityId", "type"]
       }
     }
   },
@@ -758,6 +793,27 @@
         }
       }
     },
+    "/me/activity-feed": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "Get my activity feed",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["organizer", "participant", "ratings"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "My activity feed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserActivityFeedResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/device-token": {
       "post": {
         "tags": ["notifications"],
@@ -873,6 +929,28 @@
         }
       }
     },
+    "/users/{user_id}/activity-feed": {
+      "get": {
+        "tags": ["activities"],
+        "summary": "Get user activity feed",
+        "parameters": [
+          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["organizer", "participant", "ratings"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "User activity feed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserActivityFeedResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/qr-tokens/resolve": {
       "post": {
         "tags": ["users"],
@@ -970,6 +1048,42 @@
         }
       }
     },
+    "/activities/batch": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Create multiple activities",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activities": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/CreateActivityRequest" }
+                  }
+                },
+                "required": ["activities"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created activities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ActivityDetail" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/activities/{activity_id}": {
       "get": {
         "tags": ["activities"],
@@ -1011,6 +1125,16 @@
               }
             }
           }
+        }
+      },
+      "delete": {
+        "tags": ["activities"],
+        "summary": "Delete activity",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Activity deleted" }
         }
       }
     },
@@ -1538,6 +1662,30 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activity-feed/events": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Create activity feed event",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUserActivityFeedEventRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created event",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserActivityFeedEvent" }
               }
             }
           }

@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from activities.models import Activity
+from activities.feed_views import create_feed_event
 from .models import Participation
 from .serializers import ActivityParticipantSerializer, ActivityJoinRequestSerializer
 
@@ -76,6 +77,8 @@ class ActivityJoinView(APIView):
             participation.status = Participation.Status.ACCEPTED
             participation.save()
 
+        create_feed_event(request.user, activity, 'joined')
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -142,7 +145,11 @@ class ActivityLeaveView(APIView):
             user=request.user,
             status=Participation.Status.ACCEPTED,
         )
+        activity = participation.activity
         participation.delete()
+
+        create_feed_event(request.user, activity, 'leaved')
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -315,5 +322,7 @@ class ActivityAttendanceView(APIView):
         participation.status = Participation.Status.ATTENDED
         participation.attendance_marked_at = timezone.now()
         participation.save()
+
+        create_feed_event(participation.user, activity, 'attended')
 
         return Response(status=status.HTTP_204_NO_CONTENT)

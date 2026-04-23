@@ -8,6 +8,7 @@ from django.db.models import Avg
 from activities.models import Activity
 from participation.models import Participation
 from .models import ActivityRating
+from activities.feed_views import create_feed_event
 from .serializers import ActivityRatingSerializer, CreateActivityRatingSerializer
 
 
@@ -72,6 +73,8 @@ class ActivityRatingsView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         rating = serializer.save(activity=activity, user=request.user)
+
+        create_feed_event(request.user, activity, 'rated')
 
         self._recalculate_organizer_rating(activity.organizer)
 

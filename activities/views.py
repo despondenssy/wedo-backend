@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 
+from .feed_views import create_feed_event
 from .models import Activity, SavedActivity
 from .serializers import (
     ActivityListItemSerializer,
@@ -99,6 +100,7 @@ class ActivityListView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         activity = serializer.save()
+        create_feed_event(request.user, activity, 'created')
         return Response(
             ActivityDetailSerializer(activity).data,
             status=status.HTTP_201_CREATED,
@@ -131,6 +133,16 @@ class ActivityDetailView(APIView):
 
         activity = serializer.save()
         return Response(ActivityDetailSerializer(activity, context={'request': request}).data)
+    
+    def delete(self, request, activity_id):
+        activity = get_object_or_404(Activity, id=activity_id)
+        if activity.organizer != request.user:
+            return Response(
+                {'error': {'code': 'FORBIDDEN', 'message': 'Нет прав для удаления'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        activity.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivityCancelView(APIView):
@@ -149,8 +161,38 @@ class ActivityCancelView(APIView):
         activity.status = Activity.Status.CANCELLED
         activity.cancelled_at = timezone.now()
         activity.save()
+        
+        create_feed_event(request.user, activity, 'cancelled')
 
         return Response(ActivityDetailSerializer(activity, context={'request': request}).data)
+
+
+class ActivityBatchCreateView(APIView):
+    """POST /activities/batch — создать несколько активностей."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        activities_data = request.data.get('activities', [])
+        if not activities_data:
+            return Response(
+                {'error': {'code': 'BAD_REQUEST', 'message': 'activities обязателен'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        for item in activities_data:
+            serializer = CreateActivitySerializer(
+                data=item, context={'request': request}
+            )
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            activity = serializer.save()
+            created.append(activity)
+
+        return Response(
+            ActivityDetailSerializer(created, many=True, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class RecommendedActivitiesView(APIView):

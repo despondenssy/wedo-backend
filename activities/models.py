@@ -116,3 +116,43 @@ class SavedActivity(models.Model):
 
     def __str__(self):
         return f'{self.user} → {self.activity}'
+    
+
+class UserActivityFeedEvent(models.Model):
+    class EventType(models.TextChoices):
+        CREATED = 'created', 'Created'
+        ATTENDED = 'attended', 'Attended'
+        RATED = 'rated', 'Rated'
+        CANCELLED = 'cancelled', 'Cancelled'
+        LEAVED = 'leaved', 'Leaved'
+        JOINED = 'joined', 'Joined'
+        MISSED = 'missed', 'Missed'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='activity_feed_events',
+    )
+    activity = models.ForeignKey(
+        Activity,
+        on_delete=models.CASCADE,
+        related_name='feed_events',
+    )
+    type = models.CharField(max_length=20, choices=EventType.choices)
+    occurred_at = models.DateTimeField()
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='actor_feed_events',
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'user_activity_feed_events'
+        ordering = ['-occurred_at']
+
+    def __str__(self):
+        return f'{self.user} — {self.type} — {self.activity}'
