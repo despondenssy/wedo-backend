@@ -1,0 +1,943 @@
+{
+  "info": {
+    "_postman_id": "8cc1727b-4c2c-4df4-9d0c-27bc3ce3570a",
+    "name": "WeDo Backend",
+    "description": "Manual Postman collection for testing the WeDo Backend API. Import together with the WeDo Local environment. Run Auth/Register or Auth/Login first so protected requests can use {{accessToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Status code is below 500', function () {",
+          "  pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.tokens) {",
+                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
+                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "}",
+                  "if (json.user && json.user.id) {",
+                  "  pm.environment.set('userId', json.user.id);",
+                  "  pm.environment.set('targetUserId', json.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"privacy\": {\n    \"showAvatar\": true,\n    \"showGender\": true,\n    \"showCity\": true,\n    \"showInterests\": true,\n    \"showBirthDate\": false,\n    \"showAttendanceHistory\": true,\n    \"showReviews\": true\n  }\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Register Other User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.user && json.user.id) {",
+                  "  pm.environment.set('otherUserId', json.user.id);",
+                  "  pm.environment.set('targetUserId', json.user.id);",
+                  "}",
+                  "if (json.tokens) {",
+                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
+                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"]\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.tokens) {",
+                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
+                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "}",
+                  "if (json.user && json.user.id) {",
+                  "  pm.environment.set('userId', json.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Invalid Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.environment.set('accessToken', json.accessToken);",
+                  "if (json.refreshToken) pm.environment.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Refresh Missing Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me"
+          }
+        },
+        {
+          "name": "Update Me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"]\n}"
+            },
+            "url": "{{baseUrl}}/me"
+          }
+        },
+        {
+          "name": "Delete Me",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/me"
+          }
+        },
+        {
+          "name": "Update Privacy",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showAvatar\": true,\n  \"showGender\": false,\n  \"showCity\": true,\n  \"showInterests\": true,\n  \"showBirthDate\": false,\n  \"showAttendanceHistory\": true,\n  \"showReviews\": true\n}"
+            },
+            "url": "{{baseUrl}}/me/privacy"
+          }
+        },
+        {
+          "name": "Generate QR Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) pm.environment.set('qrToken', json.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/me/qr-token"
+          }
+        },
+        {
+          "name": "Resolve QR Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{qrToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/qr-tokens/resolve"
+          }
+        },
+        {
+          "name": "My Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/my-activities?tab=created&limit=20"
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{targetUserId}}"
+          }
+        },
+        {
+          "name": "User History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{targetUserId}}/history?tab=created&limit=20"
+          }
+        },
+        {
+          "name": "User Rating",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{targetUserId}}/rating"
+          }
+        },
+        {
+          "name": "User Attendance History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{targetUserId}}/attendance-history"
+          }
+        },
+        {
+          "name": "User Activity Feed",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{targetUserId}}/activity-feed?category=organizer&limit=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities",
+      "item": [
+        {
+          "name": "List Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities?citySettlement=Moscow&categoryId=sport&limit=30"
+          }
+        },
+        {
+          "name": "Create Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.environment.set('activityId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Evening Football\",\n  \"description\": \"Friendly training session for students.\",\n  \"categoryId\": \"sport\",\n  \"subcategoryId\": \"football\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Red Square, Moscow\",\n    \"name\": \"City Center\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"startAt\": \"2026-05-20T17:00:00Z\",\n  \"endAt\": \"2026-05-20T19:00:00Z\",\n  \"timeZone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"ageFrom\": 18,\n    \"ageTo\": 35,\n    \"level\": \"beginner\",\n    \"maxParticipants\": 10\n  },\n  \"requiresApproval\": false,\n  \"photoFileIds\": [],\n  \"price\": \"0.00\"\n}"
+            },
+            "url": "{{baseUrl}}/activities"
+          }
+        },
+        {
+          "name": "Create Activity Requires Approval",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.environment.set('activityId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Closed Workshop\",\n  \"description\": \"Activity with manual approval.\",\n  \"categoryId\": \"education\",\n  \"subcategoryId\": \"workshop\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Moscow\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"startAt\": \"2026-05-25T15:00:00Z\",\n  \"endAt\": \"2026-05-25T17:00:00Z\",\n  \"timeZone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"maxParticipants\": 5\n  },\n  \"requiresApproval\": true,\n  \"photoFileIds\": [],\n  \"price\": \"100.00\"\n}"
+            },
+            "url": "{{baseUrl}}/activities"
+          }
+        },
+        {
+          "name": "Get Activity",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Update Activity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Activity Title\",\n  \"price\": \"50.00\",\n  \"preferences\": {\n    \"maxParticipants\": 12\n  }\n}"
+            },
+            "url": "{{baseUrl}}/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Delete Activity",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Cancel Activity",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activityId}}/cancel"
+          }
+        },
+        {
+          "name": "Recommended Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities/recommended?limit=30"
+          }
+        },
+        {
+          "name": "Batch Create Activities",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activities\": [\n    {\n      \"title\": \"Batch Activity 1\",\n      \"description\": \"Created from Postman batch request.\",\n      \"categoryId\": \"sport\",\n      \"subcategoryId\": \"running\",\n      \"format\": \"offline\",\n      \"location\": {\n        \"latitude\": 55.75,\n        \"longitude\": 37.61,\n        \"address\": \"Moscow\",\n        \"settlement\": \"Moscow\",\n        \"region\": \"Moscow\",\n        \"country\": \"Russia\"\n      },\n      \"startAt\": \"2026-06-01T10:00:00Z\",\n      \"endAt\": \"2026-06-01T12:00:00Z\",\n      \"timeZone\": \"Europe/Moscow\",\n      \"requiresApproval\": false,\n      \"photoFileIds\": [],\n      \"price\": \"0.00\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/activities/batch"
+          }
+        },
+        {
+          "name": "My Saved Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/saved-activities?limit=30"
+          }
+        },
+        {
+          "name": "Save Activity",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Save Activity Duplicate",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Remove Saved Activity",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "My Activity Feed",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/activity-feed?category=organizer&limit=30"
+          }
+        },
+        {
+          "name": "Create Feed Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"activityId\": \"{{activityId}}\",\n  \"type\": \"missed\",\n  \"metadata\": {\n    \"source\": \"postman\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/activity-feed/events"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Participation",
+      "item": [
+        {
+          "name": "Join Activity",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join"
+          }
+        },
+        {
+          "name": "Create Join Request",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests"
+          }
+        },
+        {
+          "name": "List Join Requests",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests?limit=20"
+          }
+        },
+        {
+          "name": "Cancel My Join Request",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/me"
+          }
+        },
+        {
+          "name": "Approve Join Request",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/{{targetUserId}}/approve"
+          }
+        },
+        {
+          "name": "Reject Join Request",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/{{targetUserId}}/reject"
+          }
+        },
+        {
+          "name": "List Participants",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities/{{activityId}}/participants?limit=30"
+          }
+        },
+        {
+          "name": "Leave Activity",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/activities/{{activityId}}/participants/me"
+          }
+        },
+        {
+          "name": "Mark Attendance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/activities/{{activityId}}/attendance"
+          }
+        },
+        {
+          "name": "Scan Attendance QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{qrToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/activities/{{activityId}}/attendance/scan"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.items && json.items.length > 0) {",
+                  "  pm.environment.set('notificationId', json.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/notifications?limit=30"
+          }
+        },
+        {
+          "name": "List Unread Request Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/notifications?unreadOnly=true&type=request&limit=30"
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"read\": true\n}"
+            },
+            "url": "{{baseUrl}}/notifications/{{notificationId}}"
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/notifications/{{notificationId}}"
+          }
+        },
+        {
+          "name": "Read All Notifications",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/notifications/read-all"
+          }
+        },
+        {
+          "name": "Save Device Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"postman-fcm-token\"\n}"
+            },
+            "url": "{{baseUrl}}/me/device-token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ratings",
+      "item": [
+        {
+          "name": "List Activity Ratings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activities/{{activityId}}/ratings?limit=20"
+          }
+        },
+        {
+          "name": "Create Activity Rating",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great activity from Postman.\"\n}"
+            },
+            "url": "{{baseUrl}}/activities/{{activityId}}/ratings"
+          }
+        },
+        {
+          "name": "Create Rating Without Attendance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Expected negative scenario.\"\n}"
+            },
+            "url": "{{baseUrl}}/activities/{{activityId}}/ratings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "My Subscriptions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/me/subscriptions?limit=30"
+          }
+        },
+        {
+          "name": "Subscriptions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/subscriptions?sort=name&limit=30"
+          }
+        },
+        {
+          "name": "Create Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/subscriptions"
+          }
+        },
+        {
+          "name": "Create Subscription Duplicate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/subscriptions"
+          }
+        },
+        {
+          "name": "Pin Subscription",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isPinned\": true\n}"
+            },
+            "url": "{{baseUrl}}/subscriptions/{{targetUserId}}"
+          }
+        },
+        {
+          "name": "Delete Subscription",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/subscriptions/{{targetUserId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        {
+          "name": "Upload Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.environment.set('fileId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/files"
+          }
+        },
+        {
+          "name": "Upload Missing File",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": []
+            },
+            "url": "{{baseUrl}}/files"
+          }
+        },
+        {
+          "name": "List Files By IDs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/files?ids={{fileId}}"
+          }
+        },
+        {
+          "name": "Download File",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/files/{{fileId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Docs",
+      "item": [
+        {
+          "name": "OpenAPI JSON",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/openapi.json"
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/docs/swagger/"
+          }
+        }
+      ]
+    }
+  ]
+}
