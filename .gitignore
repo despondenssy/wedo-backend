@@ -22,6 +22,16 @@ media/
 .vs/
 *.cursor
 
+# Tests
+.pytest_cache/
+.pytest_tmp/
+.test_media/
+pytest-cache-files-*/
+
+# Load testing
+loadtest/report*.html
+loadtest/*.csv
+
 # OS
 .DS_Store
 Thumbs.db
