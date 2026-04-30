@@ -533,18 +533,6 @@
           "hasMore": { "type": "boolean" }
         },
         "required": ["items", "hasMore"]
-      },
-      "CreateUserActivityFeedEventRequest": {
-        "type": "object",
-        "properties": {
-          "userId": { "type": "string" },
-          "activityId": { "type": "string" },
-          "type": { "type": "string", "enum": ["created", "attended", "rated", "cancelled", "leaved", "joined", "missed"] },
-          "occurredAt": { "type": "string", "format": "date-time", "nullable": true },
-          "actorUserId": { "type": "string", "nullable": true },
-          "metadata": { "type": "object", "nullable": true }
-        },
-        "required": ["userId", "activityId", "type"]
       }
     }
   },
@@ -1649,30 +1637,6 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/activity-feed/events": {
-      "post": {
-        "tags": ["activities"],
-        "summary": "Create activity feed event",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateUserActivityFeedEventRequest" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created event",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserActivityFeedEvent" }
               }
             }
           }

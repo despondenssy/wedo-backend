@@ -11,7 +11,6 @@ from .views import (
 from .feed_views import (
     MyActivityFeedView,
     UserActivityFeedView,
-    ActivityFeedEventCreateView,
 )
 
 urlpatterns = [
@@ -24,5 +23,4 @@ urlpatterns = [
     path('me/saved-activities/<int:activity_id>', SavedActivityDetailView.as_view()),
     path('me/activity-feed', MyActivityFeedView.as_view()),
     path('users/<int:user_id>/activity-feed', UserActivityFeedView.as_view()),
-    path('activity-feed/events', ActivityFeedEventCreateView.as_view()),
 ]

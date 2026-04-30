@@ -1,8 +1,11 @@
+from types import SimpleNamespace
+
 import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from activities.models import Activity, SavedActivity
+from activities.models import Activity, SavedActivity, UserActivityFeedEvent
+from activities.views import ActivityListView
 from participation.models import Participation
 
 
@@ -50,6 +53,7 @@ def test_activity_detail_patch_delete_cancel_and_permissions(
     activity.refresh_from_db()
     assert cancelled.status_code == status.HTTP_200_OK
     assert activity.status == Activity.Status.CANCELLED
+    assert UserActivityFeedEvent.objects.filter(user=user, activity=activity, type='cancelled').exists()
 
     deletable = activity_factory(organizer=user)
     deleted = api_client.delete(f'/activities/{deletable.id}')
@@ -96,7 +100,19 @@ def test_saved_activities_crud(auth_client, user, activity_factory):
     assert not SavedActivity.objects.filter(user=user, activity=activity).exists()
 
 
-def test_activity_feed_list_filters_and_manual_create(
+def test_activity_create_adds_feed_event(user, activity_payload):
+    request = SimpleNamespace(data=activity_payload, user=user)
+    created = ActivityListView().post(request)
+
+    assert created.status_code == status.HTTP_201_CREATED
+    assert UserActivityFeedEvent.objects.filter(
+        user=user,
+        activity_id=created.data['id'],
+        type='created',
+    ).exists()
+
+
+def test_activity_feed_list_filters(
     auth_client,
     user,
     other_user,
@@ -114,19 +130,3 @@ def test_activity_feed_list_filters_and_manual_create(
     user_feed = auth_client.get(f'/users/{other_user.id}/activity-feed?category=participant')
     assert user_feed.status_code == status.HTTP_200_OK
     assert len(user_feed.data['items']) == 1
-
-    created = auth_client.post(
-        '/activity-feed/events',
-        {
-            'userId': user.id,
-            'activityId': activity.id,
-            'type': 'missed',
-            'metadata': {'source': 'test'},
-        },
-        format='json',
-    )
-    assert created.status_code == status.HTTP_201_CREATED
-    assert created.data['type'] == 'missed'
-
-    invalid = auth_client.post('/activity-feed/events', {'userId': user.id}, format='json')
-    assert invalid.status_code == status.HTTP_400_BAD_REQUEST

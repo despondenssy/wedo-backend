@@ -535,23 +535,6 @@
             "method": "GET",
             "url": "{{baseUrl}}/me/activity-feed?category=organizer&limit=30"
           }
-        },
-        {
-          "name": "Create Feed Event",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"activityId\": \"{{activityId}}\",\n  \"type\": \"missed\",\n  \"metadata\": {\n    \"source\": \"postman\"\n  }\n}"
-            },
-            "url": "{{baseUrl}}/activity-feed/events"
-          }
         }
       ]
     },
