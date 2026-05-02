@@ -40,3 +40,35 @@ def swagger_ui_view(request):
 </body>
 </html>"""
     return HttpResponse(html)
+
+
+def rapidoc_view(request):
+    schema_url = reverse('openapi-json')
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeDo API RapiDoc</title>
+  <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
+  <style>
+    html,
+    body {{
+      height: 100%;
+      margin: 0;
+    }}
+  </style>
+</head>
+<body>
+  <rapi-doc
+    spec-url="{schema_url}"
+    render-style="read"
+    layout="row"
+    show-header="false"
+    allow-search="true"
+    allow-try="true"
+    default-schema-tab="schema"
+  ></rapi-doc>
+</body>
+</html>"""
+    return HttpResponse(html)

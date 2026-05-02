@@ -18,12 +18,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .docs import openapi_json_view, swagger_ui_view
+from .docs import openapi_json_view, rapidoc_view, swagger_ui_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/openapi.json', openapi_json_view, name='openapi-json'),
     path('api/docs/swagger/', swagger_ui_view, name='swagger-ui'),
+    path('api/docs/rapidoc/', rapidoc_view, name='rapidoc'),
     path('', include('users.urls')),
     path('', include('activities.urls')),
     path('', include('participation.urls')),

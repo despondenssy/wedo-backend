@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir public
           cp docs/index.html public/index.html
+          cp docs/rapidoc.html public/rapidoc.html
           cp openapi.json public/openapi.json
 
       - name: Upload Pages artifact

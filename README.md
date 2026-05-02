@@ -1,4 +1,4 @@
-# WeDo Backend
+﻿# WeDo Backend
 
 Backend для мобильного приложения WeDo — поиск и организация событий по интересам.
 
@@ -59,6 +59,10 @@ python manage.py runserver
 Интерактивная документация (Swagger UI): https://despondenssy.github.io/wedo-backend/
 
 Swagger UI также доступен локально по адресу: `http://127.0.0.1:8000/api/docs/swagger/`
+
+Альтернативная документация с более наглядным просмотром схем RapiDoc: https://despondenssy.github.io/wedo-backend/rapidoc.html
+
+RapiDoc также доступен локально по адресу: `http://127.0.0.1:8000/api/docs/rapidoc/`
 
 OpenAPI-спецификация лежит в файле `openapi.json`.
 
