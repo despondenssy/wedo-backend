@@ -39,8 +39,8 @@ class NotificationsListView(APIView):
 
         return Response({
             'items': NotificationSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 

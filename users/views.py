@@ -32,9 +32,9 @@ def get_tokens(user):
     """Генерирует пару access/refresh токенов для пользователя."""
     refresh = RefreshToken.for_user(user)
     return {
-        'accessToken': str(refresh.access_token),
-        'refreshToken': str(refresh),
-        'expiresAt': unix_timestamp_to_iso8601(refresh.access_token['exp']),
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
+        'expires_at': unix_timestamp_to_iso8601(refresh.access_token['exp']),
     }
 
 
@@ -179,8 +179,8 @@ class UserHistoryView(APIView):
 
         return Response({
             'items': ActivityListItemSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 
@@ -204,7 +204,7 @@ class QrTokenView(APIView):
 
         return Response({
             'token': qr_token.token,
-            'expiresAt': qr_token.expires_at,
+            'expires_at': qr_token.expires_at,
         })
 
 
@@ -237,7 +237,7 @@ class QrTokenResolveView(APIView):
         from .serializers import UserSnippetSerializer
         return Response({
             'user': UserSnippetSerializer(qr_token.user).data,
-            'expiresAt': qr_token.expires_at,
+            'expires_at': qr_token.expires_at,
         })
 
 
@@ -356,9 +356,9 @@ class RefreshTokenView(APIView):
         try:
             refresh = RefreshToken(refresh_token)
             return Response({
-                'accessToken': str(refresh.access_token),
-                'refreshToken': str(refresh),
-                'expiresAt': unix_timestamp_to_iso8601(refresh.access_token['exp']),
+                'access_token': str(refresh.access_token),
+                'refresh_token': str(refresh),
+                'expires_at': unix_timestamp_to_iso8601(refresh.access_token['exp']),
             })
         except Exception:
             return Response(

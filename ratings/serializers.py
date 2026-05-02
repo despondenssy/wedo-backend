@@ -6,11 +6,11 @@ from .models import ActivityRating
 class ActivityRatingSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
     user = UserSnippetSerializer()
-    createdAt = serializers.DateTimeField(source='created_at')
+    created_at = serializers.DateTimeField()
 
     class Meta:
         model = ActivityRating
-        fields = ['id', 'user', 'rating', 'comment', 'createdAt']
+        fields = ['id', 'user', 'rating', 'comment', 'created_at']
 
 
 class CreateActivityRatingSerializer(serializers.ModelSerializer):

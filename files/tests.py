@@ -13,13 +13,13 @@ def test_file_upload_list_download_and_missing_disk_file(auth_client, settings, 
 
     created = auth_client.post('/files', {'file': upload}, format='multipart')
     assert created.status_code == status.HTTP_201_CREATED
-    file_obj = File.objects.get(id=created.data['id'])
+    file_obj = File.objects.get(id=created.json()['id'])
     assert file_obj.original_name == 'avatar.png'
     assert (settings.MEDIA_ROOT / file_obj.storage_key).exists()
 
     listed = auth_client.get(f'/files?ids={file_obj.id}')
     assert listed.status_code == status.HTTP_200_OK
-    assert listed.data['items'][0]['id'] == str(file_obj.id)
+    assert listed.json()['items'][0]['id'] == str(file_obj.id)
 
     downloaded = auth_client.get(f'/files/{file_obj.id}')
     assert downloaded.status_code == status.HTTP_200_OK

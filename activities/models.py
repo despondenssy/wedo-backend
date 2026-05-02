@@ -88,13 +88,13 @@ class Activity(models.Model):
         if self.pref_gender:
             prefs['gender'] = self.pref_gender
         if self.pref_age_from is not None:
-            prefs['ageFrom'] = self.pref_age_from
+            prefs['age_from'] = self.pref_age_from
         if self.pref_age_to is not None:
-            prefs['ageTo'] = self.pref_age_to
+            prefs['age_to'] = self.pref_age_to
         if self.pref_level:
             prefs['level'] = self.pref_level
         if self.pref_max_participants is not None:
-            prefs['maxParticipants'] = self.pref_max_participants
+            prefs['max_participants'] = self.pref_max_participants
         return prefs if prefs else None
 
 class SavedActivity(models.Model):

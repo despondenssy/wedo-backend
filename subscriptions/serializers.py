@@ -4,22 +4,21 @@ from .models import Subscription
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    userId = serializers.SerializerMethodField()
-    subscribedAt = serializers.DateTimeField(source='created_at')
-    isPinned = serializers.BooleanField(source='is_pinned')
+    user_id = serializers.SerializerMethodField()
+    subscribed_at = serializers.DateTimeField(source='created_at')
     user = UserSnippetSerializer(source='target')
 
     class Meta:
         model = Subscription
-        fields = ['userId', 'subscribedAt', 'isPinned', 'user']
+        fields = ['user_id', 'subscribed_at', 'is_pinned', 'user']
 
-    def get_userId(self, obj):
+    def get_user_id(self, obj):
         return str(obj.target_id)
 
 
 class CreateSubscriptionSerializer(serializers.Serializer):
-    userId = serializers.IntegerField()
+    user_id = serializers.IntegerField()
 
 
 class UpdateSubscriptionSerializer(serializers.Serializer):
-    isPinned = serializers.BooleanField(required=False)
+    is_pinned = serializers.BooleanField(required=False)

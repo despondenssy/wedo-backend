@@ -90,8 +90,8 @@ class ActivityListView(APIView):
 
         return Response({
             'items': ActivityListItemSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
     def post(self, request):
@@ -237,7 +237,7 @@ class RecommendedActivitiesView(APIView):
         candidates = list(queryset[:limit * 3])
 
         if not candidates:
-            return Response({'items': [], 'nextCursor': None, 'hasMore': False})
+            return Response({'items': [], 'next_cursor': None, 'has_more': False})
 
         # считаем n_max для формулы P(e) = n(e) / n_max
         from participation.models import Participation
@@ -263,8 +263,8 @@ class RecommendedActivitiesView(APIView):
 
         return Response({
             'items': ActivityListItemSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
     def _score(self, activity, user):
@@ -430,8 +430,8 @@ class SavedActivitiesView(APIView):
 
         return Response({
             'items': ActivityListItemSerializer(activities, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 

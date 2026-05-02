@@ -14,24 +14,24 @@ class CitySerializer(serializers.Serializer):
 
 
 class PrivacySerializer(serializers.Serializer):
-    showAvatar = serializers.BooleanField()
-    showGender = serializers.BooleanField()
-    showCity = serializers.BooleanField()
-    showInterests = serializers.BooleanField()
-    showBirthDate = serializers.BooleanField()
-    showAttendanceHistory = serializers.BooleanField()
-    showReviews = serializers.BooleanField()
+    show_avatar = serializers.BooleanField()
+    show_gender = serializers.BooleanField()
+    show_city = serializers.BooleanField()
+    show_interests = serializers.BooleanField()
+    show_birth_date = serializers.BooleanField()
+    show_attendance_history = serializers.BooleanField()
+    show_reviews = serializers.BooleanField()
 
 
 class PrivacyRegisterSerializer(serializers.Serializer):
     """Privacy настройки при регистрации — все поля опциональны."""
-    showAvatar = serializers.BooleanField(required=False, default=True)
-    showGender = serializers.BooleanField(required=False, default=True)
-    showCity = serializers.BooleanField(required=False, default=True)
-    showInterests = serializers.BooleanField(required=False, default=True)
-    showBirthDate = serializers.BooleanField(required=False, default=False)
-    showAttendanceHistory = serializers.BooleanField(required=False, default=True)
-    showReviews = serializers.BooleanField(required=False, default=True)
+    show_avatar = serializers.BooleanField(required=False, default=True)
+    show_gender = serializers.BooleanField(required=False, default=True)
+    show_city = serializers.BooleanField(required=False, default=True)
+    show_interests = serializers.BooleanField(required=False, default=True)
+    show_birth_date = serializers.BooleanField(required=False, default=False)
+    show_attendance_history = serializers.BooleanField(required=False, default=True)
+    show_reviews = serializers.BooleanField(required=False, default=True)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -60,13 +60,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
 
         if privacy_data:
-            user.show_avatar = privacy_data.get('showAvatar', True)
-            user.show_gender = privacy_data.get('showGender', True)
-            user.show_city = privacy_data.get('showCity', True)
-            user.show_interests = privacy_data.get('showInterests', True)
-            user.show_birth_date = privacy_data.get('showBirthDate', False)
-            user.show_attendance_history = privacy_data.get('showAttendanceHistory', True)
-            user.show_reviews = privacy_data.get('showReviews', True)
+            user.show_avatar = privacy_data.get('show_avatar', True)
+            user.show_gender = privacy_data.get('show_gender', True)
+            user.show_city = privacy_data.get('show_city', True)
+            user.show_interests = privacy_data.get('show_interests', True)
+            user.show_birth_date = privacy_data.get('show_birth_date', False)
+            user.show_attendance_history = privacy_data.get('show_attendance_history', True)
+            user.show_reviews = privacy_data.get('show_reviews', True)
 
         user.save()
         return user
@@ -79,11 +79,11 @@ class LoginSerializer(serializers.Serializer):
 
 class UpdateMeSerializer(serializers.ModelSerializer):
     city = CitySerializer(required=False)
-    avatarFileId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    avatar_file_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = User
-        fields = ['name', 'avatarFileId', 'birth_date', 'gender', 'city', 'interests']
+        fields = ['name', 'avatar_file_id', 'birth_date', 'gender', 'city', 'interests']
         extra_kwargs = {
             'name': {'required': False},
             'birth_date': {'required': False},
@@ -93,7 +93,7 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         city_data = validated_data.pop('city', None)
-        avatar_file_id = validated_data.pop('avatarFileId', None)
+        avatar_file_id = validated_data.pop('avatar_file_id', None)
 
         if city_data:
             instance.city_settlement = city_data['settlement']
@@ -118,23 +118,23 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
 
 class UpdatePrivacySerializer(serializers.Serializer):
-    showAvatar = serializers.BooleanField(required=False)
-    showGender = serializers.BooleanField(required=False)
-    showCity = serializers.BooleanField(required=False)
-    showInterests = serializers.BooleanField(required=False)
-    showBirthDate = serializers.BooleanField(required=False)
-    showAttendanceHistory = serializers.BooleanField(required=False)
-    showReviews = serializers.BooleanField(required=False)
+    show_avatar = serializers.BooleanField(required=False)
+    show_gender = serializers.BooleanField(required=False)
+    show_city = serializers.BooleanField(required=False)
+    show_interests = serializers.BooleanField(required=False)
+    show_birth_date = serializers.BooleanField(required=False)
+    show_attendance_history = serializers.BooleanField(required=False)
+    show_reviews = serializers.BooleanField(required=False)
 
     def update(self, instance, validated_data):
         mapping = {
-            'showAvatar': 'show_avatar',
-            'showGender': 'show_gender',
-            'showCity': 'show_city',
-            'showInterests': 'show_interests',
-            'showBirthDate': 'show_birth_date',
-            'showAttendanceHistory': 'show_attendance_history',
-            'showReviews': 'show_reviews',
+            'show_avatar': 'show_avatar',
+            'show_gender': 'show_gender',
+            'show_city': 'show_city',
+            'show_interests': 'show_interests',
+            'show_birth_date': 'show_birth_date',
+            'show_attendance_history': 'show_attendance_history',
+            'show_reviews': 'show_reviews',
         }
         for field, db_field in mapping.items():
             if field in validated_data:
@@ -145,13 +145,13 @@ class UpdatePrivacySerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
-    avatarFileId = serializers.SerializerMethodField()
+    avatar_file_id = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
     privacy = serializers.SerializerMethodField()
-    attendanceHistory = serializers.SerializerMethodField()
-    isCurrentUser = serializers.SerializerMethodField()
-    isSubscribed = serializers.SerializerMethodField()
-    reviewsPreview = serializers.SerializerMethodField()
+    attendance_history = serializers.SerializerMethodField()
+    is_current_user = serializers.SerializerMethodField()
+    is_subscribed = serializers.SerializerMethodField()
+    reviews_preview = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     gender = serializers.SerializerMethodField()
     interests = serializers.SerializerMethodField()
@@ -159,9 +159,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'avatarFileId', 'rating', 'age', 'gender',
-            'city', 'interests', 'attendanceHistory',
-            'reviewsPreview', 'privacy', 'isCurrentUser', 'isSubscribed',
+            'id', 'name', 'avatar_file_id', 'rating', 'age', 'gender',
+            'city', 'interests', 'attendance_history',
+            'reviews_preview', 'privacy', 'is_current_user', 'is_subscribed',
         ]
 
     def _is_current_user(self, obj):
@@ -173,7 +173,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return request.user.id == obj.id
         return False
 
-    def get_avatarFileId(self, obj):
+    def get_avatar_file_id(self, obj):
         if self._is_current_user(obj) or obj.show_avatar:
             return str(obj.avatar_file_id) if obj.avatar_file_id else None
         return None
@@ -203,7 +203,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.privacy
         return None
 
-    def get_attendanceHistory(self, obj):
+    def get_attendance_history(self, obj):
         if not (self._is_current_user(obj) or obj.show_attendance_history):
             return None
         from participation.models import Participation
@@ -217,10 +217,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ).count()
         return {'attended': attended, 'missed': missed}
 
-    def get_isCurrentUser(self, obj):
+    def get_is_current_user(self, obj):
         return self._is_current_user(obj)
 
-    def get_isSubscribed(self, obj):
+    def get_is_subscribed(self, obj):
         if self._is_current_user(obj):
             return None
         request = self.context.get('request')
@@ -232,7 +232,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             ).exists()
         return False
 
-    def get_reviewsPreview(self, obj):
+    def get_reviews_preview(self, obj):
         if not (self._is_current_user(obj) or obj.show_reviews):
             return None
 
@@ -245,12 +245,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return [
             {
                 'id': str(r.id),
-                'fromUserId': str(r.user.id),
-                'fromUserName': r.user.name,
+                'from_user_id': str(r.user.id),
+                'from_user_name': r.user.name,
                 'rating': r.rating,
                 'text': r.comment,
                 'date': r.created_at.isoformat(),
-                'activityId': str(r.activity.id),
+                'activity_id': str(r.activity.id),
             }
             for r in ratings
         ]
@@ -259,11 +259,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserSnippetSerializer(serializers.ModelSerializer):
     """Компактный профиль для вложений — карточки активностей, списки участников."""
     id = serializers.CharField()
-    avatarFileId = serializers.SerializerMethodField()
+    avatar_file_id = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'avatarFileId', 'rating']
+        fields = ['id', 'name', 'avatar_file_id', 'rating']
 
-    def get_avatarFileId(self, obj):
+    def get_avatar_file_id(self, obj):
         return str(obj.avatar_file_id) if obj.avatar_file_id else None

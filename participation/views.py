@@ -249,8 +249,8 @@ class ActivityParticipantsView(APIView):
 
         return Response({
             'items': ActivityParticipantSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 
@@ -288,8 +288,8 @@ class ActivityJoinRequestsView(APIView):
 
         return Response({
             'items': ActivityJoinRequestSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 

@@ -38,8 +38,8 @@ class ActivityRatingsView(APIView):
 
         return Response({
             'items': ActivityRatingSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
     def post(self, request, activity_id):

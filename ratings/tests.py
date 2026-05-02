@@ -39,7 +39,7 @@ def test_rating_list_create_recalculate_and_duplicate(
 
     list_response = auth_client.get(f'/activities/{activity.id}/ratings')
     assert list_response.status_code == status.HTTP_200_OK
-    assert list_response.data['items'][0]['rating'] == 5
+    assert list_response.json()['items'][0]['rating'] == 5
 
 
 def test_rating_requires_attendance_and_valid_value(auth_client, activity):

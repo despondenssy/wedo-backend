@@ -1,11 +1,8 @@
-from types import SimpleNamespace
-
 import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
 
 from activities.models import Activity, SavedActivity, UserActivityFeedEvent
-from activities.views import ActivityListView
 from participation.models import Participation
 
 
@@ -21,9 +18,10 @@ def test_activity_list_filters_pagination_and_requires_auth(api_client, auth_cli
 
     response = auth_client.get('/activities?categoryId=sport&citySettlement=Moscow&limit=1')
     assert response.status_code == status.HTTP_200_OK
-    assert response.data['items'][0]['id'] == str(football.id)
-    assert response.data['hasMore'] is False
-    assert response.data['nextCursor'] is None
+    body = response.json()
+    assert body['items'][0]['id'] == str(football.id)
+    assert body['hasMore'] is False
+    assert body['nextCursor'] is None
 
 
 def test_activity_detail_patch_delete_cancel_and_permissions(
@@ -37,7 +35,7 @@ def test_activity_detail_patch_delete_cancel_and_permissions(
 
     detail = auth_client.get(f'/activities/{activity.id}')
     assert detail.status_code == status.HTTP_200_OK
-    assert detail.data['policyFlags']['canEdit'] is True
+    assert detail.json()['policyFlags']['canEdit'] is True
 
     patched = auth_client.patch(f'/activities/{activity.id}', {'title': 'Renamed'}, format='json')
     activity.refresh_from_db()
@@ -73,7 +71,8 @@ def test_recommended_excludes_joined_and_organizer_activities(
     participation_factory(joined, user, status=Participation.Status.ACCEPTED)
 
     response = auth_client.get('/activities/recommended?limit=10')
-    ids = [item['id'] for item in response.data['items']]
+    body = response.json()
+    ids = [item['id'] for item in body['items']]
 
     assert response.status_code == status.HTTP_200_OK
     assert str(candidate.id) in ids
@@ -93,21 +92,24 @@ def test_saved_activities_crud(auth_client, user, activity_factory):
 
     list_response = auth_client.get('/me/saved-activities')
     assert list_response.status_code == status.HTTP_200_OK
-    assert list_response.data['items'][0]['id'] == str(activity.id)
+    assert list_response.json()['items'][0]['id'] == str(activity.id)
 
     deleted = auth_client.delete(f'/me/saved-activities/{activity.id}')
     assert deleted.status_code == status.HTTP_204_NO_CONTENT
     assert not SavedActivity.objects.filter(user=user, activity=activity).exists()
 
 
-def test_activity_create_adds_feed_event(user, activity_payload):
-    request = SimpleNamespace(data=activity_payload, user=user)
-    created = ActivityListView().post(request)
+def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
+    created = auth_client.post('/activities', activity_payload, format='json')
 
     assert created.status_code == status.HTTP_201_CREATED
+    body = created.json()
+    assert body['categoryId'] == 'sport'
+    assert body['preferences']['ageFrom'] == 18
+    assert body['preferences']['maxParticipants'] == 5
     assert UserActivityFeedEvent.objects.filter(
         user=user,
-        activity_id=created.data['id'],
+        activity_id=body['id'],
         type='created',
     ).exists()
 
@@ -125,8 +127,8 @@ def test_activity_feed_list_filters(
 
     mine = auth_client.get('/me/activity-feed?category=organizer')
     assert mine.status_code == status.HTTP_200_OK
-    assert [item['id'] for item in mine.data['items']] == [str(organizer_event.id)]
+    assert [item['id'] for item in mine.json()['items']] == [str(organizer_event.id)]
 
     user_feed = auth_client.get(f'/users/{other_user.id}/activity-feed?category=participant')
     assert user_feed.status_code == status.HTTP_200_OK
-    assert len(user_feed.data['items']) == 1
+    assert len(user_feed.json()['items']) == 1

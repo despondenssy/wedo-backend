@@ -28,12 +28,12 @@ class UserActivityFeedEventSerializer:
     def serialize(event):
         return {
             'id': str(event.id),
-            'userId': str(event.user_id),
-            'activityId': str(event.activity_id),
+            'user_id': str(event.user_id),
+            'activity_id': str(event.activity_id),
             'type': event.type,
-            'occurredAt': event.occurred_at.isoformat(),
-            'createdAt': event.created_at.isoformat(),
-            'actorUserId': str(event.actor_user_id) if event.actor_user_id else None,
+            'occurred_at': event.occurred_at.isoformat(),
+            'created_at': event.created_at.isoformat(),
+            'actor_user_id': str(event.actor_user_id) if event.actor_user_id else None,
             'metadata': event.metadata,
         }
 
@@ -74,8 +74,8 @@ class MyActivityFeedView(APIView):
 
         return Response({
             'items': [UserActivityFeedEventSerializer.serialize(e) for e in items],
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
 
@@ -116,6 +116,6 @@ class UserActivityFeedView(APIView):
 
         return Response({
             'items': [UserActivityFeedEventSerializer.serialize(e) for e in items],
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })

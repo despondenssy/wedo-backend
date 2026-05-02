@@ -119,7 +119,7 @@ def test_participants_leave_and_manual_attendance(
 
     participants = api_client.get(f'/activities/{activity.id}/participants')
     assert participants.status_code == status.HTTP_200_OK
-    assert participants.data['items'][0]['user']['id'] == str(user.id)
+    assert participants.json()['items'][0]['user']['id'] == str(user.id)
 
     attended = api_client.post(
         f'/activities/{activity.id}/attendance',

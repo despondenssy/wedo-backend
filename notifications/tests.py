@@ -21,13 +21,13 @@ def test_notifications_list_filters_mark_read_unread_read_all_and_delete(
 
     list_response = auth_client.get('/me/notifications?unreadOnly=true&type=system')
     assert list_response.status_code == status.HTTP_200_OK
-    assert [item['id'] for item in list_response.data['items']] == [str(unread.id)]
+    assert [item['id'] for item in list_response.json()['items']] == [str(unread.id)]
 
     marked = auth_client.patch(f'/notifications/{unread.id}', {'read': True}, format='json')
     unread.refresh_from_db()
     assert marked.status_code == status.HTTP_200_OK
     assert unread.read_at is not None
-    assert marked.data['read'] is True
+    assert marked.json()['read'] is True
 
     unread_again = auth_client.patch(f'/notifications/{unread.id}', {'read': False}, format='json')
     unread.refresh_from_db()

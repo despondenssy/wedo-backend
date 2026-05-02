@@ -94,13 +94,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def privacy(self):
         return {
-            'showAvatar': self.show_avatar,
-            'showGender': self.show_gender,
-            'showCity': self.show_city,
-            'showInterests': self.show_interests,
-            'showBirthDate': self.show_birth_date,
-            'showAttendanceHistory': self.show_attendance_history,
-            'showReviews': self.show_reviews,
+            'show_avatar': self.show_avatar,
+            'show_gender': self.show_gender,
+            'show_city': self.show_city,
+            'show_interests': self.show_interests,
+            'show_birth_date': self.show_birth_date,
+            'show_attendance_history': self.show_attendance_history,
+            'show_reviews': self.show_reviews,
         }
 
 class QrToken(models.Model):

@@ -49,8 +49,8 @@ class SubscriptionsListView(APIView):
 
         return Response({
             'items': SubscriptionSerializer(items, many=True).data,
-            'nextCursor': next_cursor,
-            'hasMore': has_more,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
         })
 
     def post(self, request):
@@ -58,7 +58,7 @@ class SubscriptionsListView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        target_id = serializer.validated_data['userId']
+        target_id = serializer.validated_data['user_id']
         target = get_object_or_404(User, id=target_id)
 
         if target == request.user:
@@ -79,9 +79,9 @@ class SubscriptionsListView(APIView):
             )
 
         return Response({
-            'userId': str(target_id),
-            'subscribedAt': subscription.created_at,
-            'isPinned': subscription.is_pinned,
+            'user_id': str(target_id),
+            'subscribed_at': subscription.created_at,
+            'is_pinned': subscription.is_pinned,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -97,7 +97,7 @@ class SubscriptionDetailView(APIView):
         subscription.delete()
 
         return Response({
-            'userId': str(user_id),
+            'user_id': str(user_id),
             'deleted': True,
         })
 
@@ -112,11 +112,11 @@ class SubscriptionDetailView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if 'isPinned' in serializer.validated_data:
-            subscription.is_pinned = serializer.validated_data['isPinned']
+        if 'is_pinned' in serializer.validated_data:
+            subscription.is_pinned = serializer.validated_data['is_pinned']
             subscription.save()
 
         return Response({
-            'userId': str(user_id),
-            'isPinned': subscription.is_pinned,
+            'user_id': str(user_id),
+            'is_pinned': subscription.is_pinned,
         })
