@@ -32,7 +32,9 @@ def swagger_ui_view(request):
       url: "{schema_url}",
       dom_id: "#swagger-ui",
       deepLinking: true,
-      persistAuthorization: true
+      persistAuthorization: true,
+      defaultModelsExpandDepth: 10,
+      defaultModelExpandDepth: 10
     }});
   </script>
 </body>
