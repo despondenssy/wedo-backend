@@ -13,40 +13,18 @@ class CitySerializer(serializers.Serializer):
     title = serializers.CharField(required=False, allow_blank=True)
 
 
-class PrivacySerializer(serializers.Serializer):
-    show_avatar = serializers.BooleanField()
-    show_gender = serializers.BooleanField()
-    show_city = serializers.BooleanField()
-    show_interests = serializers.BooleanField()
-    show_birth_date = serializers.BooleanField()
-    show_attendance_history = serializers.BooleanField()
-    show_reviews = serializers.BooleanField()
-
-
-class PrivacyRegisterSerializer(serializers.Serializer):
-    """Privacy настройки при регистрации — все поля опциональны."""
-    show_avatar = serializers.BooleanField(required=False, default=True)
-    show_gender = serializers.BooleanField(required=False, default=True)
-    show_city = serializers.BooleanField(required=False, default=True)
-    show_interests = serializers.BooleanField(required=False, default=True)
-    show_birth_date = serializers.BooleanField(required=False, default=False)
-    show_attendance_history = serializers.BooleanField(required=False, default=True)
-    show_reviews = serializers.BooleanField(required=False, default=True)
-
-
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     city = CitySerializer()
-    privacy = PrivacyRegisterSerializer(required=False)
+    show_birth_date = serializers.BooleanField(required=True)
 
     class Meta:
         model = User
-        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'privacy']
+        fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'show_birth_date']
 
     def create(self, validated_data):
         city_data = validated_data.pop('city')
         password = validated_data.pop('password')
-        privacy_data = validated_data.pop('privacy', {})
 
         user = User(
             city_settlement=city_data['settlement'],
@@ -58,16 +36,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         user.set_password(password)
-
-        if privacy_data:
-            user.show_avatar = privacy_data.get('show_avatar', True)
-            user.show_gender = privacy_data.get('show_gender', True)
-            user.show_city = privacy_data.get('show_city', True)
-            user.show_interests = privacy_data.get('show_interests', True)
-            user.show_birth_date = privacy_data.get('show_birth_date', False)
-            user.show_attendance_history = privacy_data.get('show_attendance_history', True)
-            user.show_reviews = privacy_data.get('show_reviews', True)
-
         user.save()
         return user
 
@@ -83,12 +51,13 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['name', 'avatar_file_id', 'birth_date', 'gender', 'city', 'interests']
+        fields = ['name', 'avatar_file_id', 'birth_date', 'gender', 'city', 'interests', 'show_birth_date']
         extra_kwargs = {
             'name': {'required': False},
             'birth_date': {'required': False},
             'gender': {'required': False},
             'interests': {'required': False},
+            'show_birth_date': {'required': False},
         }
 
     def update(self, instance, validated_data):
@@ -117,37 +86,10 @@ class UpdateMeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class UpdatePrivacySerializer(serializers.Serializer):
-    show_avatar = serializers.BooleanField(required=False)
-    show_gender = serializers.BooleanField(required=False)
-    show_city = serializers.BooleanField(required=False)
-    show_interests = serializers.BooleanField(required=False)
-    show_birth_date = serializers.BooleanField(required=False)
-    show_attendance_history = serializers.BooleanField(required=False)
-    show_reviews = serializers.BooleanField(required=False)
-
-    def update(self, instance, validated_data):
-        mapping = {
-            'show_avatar': 'show_avatar',
-            'show_gender': 'show_gender',
-            'show_city': 'show_city',
-            'show_interests': 'show_interests',
-            'show_birth_date': 'show_birth_date',
-            'show_attendance_history': 'show_attendance_history',
-            'show_reviews': 'show_reviews',
-        }
-        for field, db_field in mapping.items():
-            if field in validated_data:
-                setattr(instance, db_field, validated_data[field])
-        instance.save()
-        return instance
-
-
 class UserProfileSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
     avatar_file_id = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
-    privacy = serializers.SerializerMethodField()
     attendance_history = serializers.SerializerMethodField()
     is_current_user = serializers.SerializerMethodField()
     is_subscribed = serializers.SerializerMethodField()
@@ -159,9 +101,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'avatar_file_id', 'rating', 'age', 'gender',
+            'id', 'name', 'avatar_file_id', 'rating', 'age', 'gender', 'show_birth_date',
             'city', 'interests', 'attendance_history',
-            'reviews_preview', 'privacy', 'is_current_user', 'is_subscribed',
+            'reviews_preview', 'is_current_user', 'is_subscribed',
         ]
 
     def _is_current_user(self, obj):
@@ -174,9 +116,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return False
 
     def get_avatar_file_id(self, obj):
-        if self._is_current_user(obj) or obj.show_avatar:
-            return str(obj.avatar_file_id) if obj.avatar_file_id else None
-        return None
+        return str(obj.avatar_file_id) if obj.avatar_file_id else None
 
     def get_age(self, obj):
         if self._is_current_user(obj) or obj.show_birth_date:
@@ -184,28 +124,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
     def get_gender(self, obj):
-        if self._is_current_user(obj) or obj.show_gender:
-            return obj.gender
-        return None
+        return obj.gender
 
     def get_city(self, obj):
-        if self._is_current_user(obj) or obj.show_city:
-            return obj.city
-        return None
+        return obj.city
 
     def get_interests(self, obj):
-        if self._is_current_user(obj) or obj.show_interests:
-            return obj.interests
-        return None
-
-    def get_privacy(self, obj):
-        if self._is_current_user(obj):
-            return obj.privacy
-        return None
+        return obj.interests
 
     def get_attendance_history(self, obj):
-        if not (self._is_current_user(obj) or obj.show_attendance_history):
-            return None
         from participation.models import Participation
         attended = Participation.objects.filter(
             user=obj,
@@ -233,9 +160,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return False
 
     def get_reviews_preview(self, obj):
-        if not (self._is_current_user(obj) or obj.show_reviews):
-            return None
-
         from ratings.models import ActivityRating
         ratings = ActivityRating.objects.filter(
             activity__organizer=obj,

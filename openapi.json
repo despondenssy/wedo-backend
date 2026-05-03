@@ -56,18 +56,6 @@
           "title": { "type": "string", "nullable": true }
         }
       },
-      "Privacy": {
-        "type": "object",
-        "properties": {
-          "showAvatar": { "type": "boolean" },
-          "showGender": { "type": "boolean" },
-          "showCity": { "type": "boolean" },
-          "showInterests": { "type": "boolean" },
-          "showBirthDate": { "type": "boolean" },
-          "showAttendanceHistory": { "type": "boolean" },
-          "showReviews": { "type": "boolean" }
-        }
-      },
       "UserSnippet": {
         "type": "object",
         "properties": {
@@ -94,6 +82,7 @@
           "rating": { "type": "number" },
           "age": { "type": "integer", "nullable": true },
           "gender": { "type": "string", "nullable": true },
+          "showBirthDate": { "type": "boolean" },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" }, "nullable": true },
           "attendanceHistory": { "allOf": [{ "$ref": "#/components/schemas/AttendanceHistory" }], "nullable": true },
@@ -114,11 +103,10 @@
               "required": ["id", "fromUserId", "fromUserName", "rating", "text", "date", "activityId"]
             }
           },
-          "privacy": { "allOf": [{ "$ref": "#/components/schemas/Privacy" }], "nullable": true },
           "isCurrentUser": { "type": "boolean" },
           "isSubscribed": { "type": "boolean", "nullable": true }
         },
-        "required": ["id", "name", "rating", "isCurrentUser"]
+        "required": ["id", "name", "rating", "showBirthDate", "isCurrentUser"]
       },
       "AuthTokens": {
         "type": "object",
@@ -147,9 +135,9 @@
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
-          "privacy": { "allOf": [{ "$ref": "#/components/schemas/Privacy" }], "nullable": true }
+          "showBirthDate": { "type": "boolean" }
         },
-        "required": ["name", "email", "password", "birthDate", "gender", "city"]
+        "required": ["name", "email", "password", "birthDate", "gender", "city", "showBirthDate"]
       },
       "LoginRequest": {
         "type": "object",
@@ -167,19 +155,8 @@
           "birthDate": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
-          "interests": { "type": "array", "items": { "type": "string" } }
-        }
-      },
-      "UpdatePrivacyRequest": {
-        "type": "object",
-        "properties": {
-          "showAvatar": { "type": "boolean" },
-          "showGender": { "type": "boolean" },
-          "showCity": { "type": "boolean" },
-          "showInterests": { "type": "boolean" },
-          "showBirthDate": { "type": "boolean" },
-          "showAttendanceHistory": { "type": "boolean" },
-          "showReviews": { "type": "boolean" }
+          "interests": { "type": "array", "items": { "type": "string" } },
+          "showBirthDate": { "type": "boolean" }
         }
       },
       "QrTokenResolveRequest": {
@@ -711,30 +688,6 @@
         "summary": "Delete current user account",
         "responses": {
           "204": { "description": "Account deleted" }
-        }
-      }
-    },
-    "/me/privacy": {
-      "patch": {
-        "tags": ["users"],
-        "summary": "Update privacy settings",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/UpdatePrivacyRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated privacy settings",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Privacy" }
-              }
-            }
-          }
         }
       }
     },

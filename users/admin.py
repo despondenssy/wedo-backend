@@ -65,7 +65,7 @@ class UserAdmin(BaseUserAdmin):
 
     fieldsets = ( #настраивает структуру при редактировании существующего пользователя
         (None, {'fields': ('email', 'password')}),
-        ('Personal info', {'fields': ('name', 'birth_date', 'gender', 'avatar_url', 'rating', 'interests')}),
+        ('Personal info', {'fields': ('name', 'birth_date', 'gender', 'avatar_file', 'rating', 'interests')}),
         (
             'City',
             {
@@ -80,17 +80,9 @@ class UserAdmin(BaseUserAdmin):
             },
         ),
         (
-            'Privacy',
+            'Profile visibility',
             {
-                'fields': (
-                    'show_avatar',
-                    'show_gender',
-                    'show_city_place',
-                    'show_interests',
-                    'show_birth_date',
-                    'show_attendance_history',
-                    'show_reviews',
-                )
+                'fields': ('show_birth_date',)
             },
         ),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),

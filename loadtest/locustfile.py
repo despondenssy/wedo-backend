@@ -53,15 +53,7 @@ class WeDoApiUser(HttpUser):
                 'title': 'Moscow',
             },
             'interests': ['sport', 'board-games', 'music'],
-            'privacy': {
-                'showAvatar': True,
-                'showGender': True,
-                'showCity': True,
-                'showInterests': True,
-                'showBirthDate': False,
-                'showAttendanceHistory': True,
-                'showReviews': True,
-            },
+            'showBirthDate': False,
         }
 
     def _register_primary_user(self):

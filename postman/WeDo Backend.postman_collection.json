@@ -66,7 +66,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"privacy\": {\n    \"showAvatar\": true,\n    \"showGender\": true,\n    \"showCity\": true,\n    \"showInterests\": true,\n    \"showBirthDate\": false,\n    \"showAttendanceHistory\": true,\n    \"showReviews\": true\n  }\n}"
+              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"showBirthDate\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -105,7 +105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"]\n}"
+              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"],\n  \"showBirthDate\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -262,7 +262,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"]\n}"
+              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"],\n  \"showBirthDate\": true\n}"
             },
             "url": "{{baseUrl}}/me"
           }
@@ -272,23 +272,6 @@
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/me"
-          }
-        },
-        {
-          "name": "Update Privacy",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"showAvatar\": true,\n  \"showGender\": false,\n  \"showCity\": true,\n  \"showInterests\": true,\n  \"showBirthDate\": false,\n  \"showAttendanceHistory\": true,\n  \"showReviews\": true\n}"
-            },
-            "url": "{{baseUrl}}/me/privacy"
           }
         },
         {

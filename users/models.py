@@ -47,13 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     city_title = models.CharField(max_length=255, blank=True, null=True)
 
     # privacy
-    show_avatar = models.BooleanField(default=True)
-    show_gender = models.BooleanField(default=True)
-    show_city = models.BooleanField(default=True)
-    show_interests = models.BooleanField(default=True)
     show_birth_date = models.BooleanField(default=False)
-    show_attendance_history = models.BooleanField(default=True)
-    show_reviews = models.BooleanField(default=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -89,18 +83,6 @@ class User(AbstractBaseUser, PermissionsMixin):
             'latitude': self.city_latitude,
             'longitude': self.city_longitude,
             'title': self.city_title,
-        }
-
-    @property
-    def privacy(self):
-        return {
-            'show_avatar': self.show_avatar,
-            'show_gender': self.show_gender,
-            'show_city': self.show_city,
-            'show_interests': self.show_interests,
-            'show_birth_date': self.show_birth_date,
-            'show_attendance_history': self.show_attendance_history,
-            'show_reviews': self.show_reviews,
         }
 
 class QrToken(models.Model):

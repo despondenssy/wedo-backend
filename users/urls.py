@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    RegisterView, LoginView, MeView, MePrivacyView,
+    RegisterView, LoginView, MeView,
     MyActivitiesView, UserDetailView, UserHistoryView,
     UserRatingView, UserAttendanceHistoryView,
     QrTokenView, QrTokenResolveView, QrAttendanceScanView,
@@ -13,7 +13,6 @@ urlpatterns = [
     path('auth/logout', LogoutView.as_view()),
     path('auth/refresh', RefreshTokenView.as_view()),
     path('me', MeView.as_view()),
-    path('me/privacy', MePrivacyView.as_view()),
     path('me/qr-token', QrTokenView.as_view()),
     path('me/my-activities', MyActivitiesView.as_view()),
     path('users/<int:user_id>', UserDetailView.as_view()),

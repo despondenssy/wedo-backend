@@ -28,7 +28,7 @@ def register_payload(email='new@example.com'):
             'title': 'Moscow',
         },
         'interests': ['sport'],
-        'privacy': {'showBirthDate': True},
+        'showBirthDate': True,
     }
 
 
@@ -37,7 +37,7 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
 
     assert response.status_code == status.HTTP_201_CREATED
     body = response.json()
-    assert body['user']['privacy']['showBirthDate'] is True
+    assert body['user']['showBirthDate'] is True
     assert body['tokens']['accessToken']
     assert User.objects.filter(email='new@example.com').exists()
     user = User.objects.get(email='new@example.com')
@@ -69,6 +69,16 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
     assert logout.status_code == status.HTTP_204_NO_CONTENT
 
 
+def test_register_requires_show_birth_date(api_client):
+    payload = register_payload()
+    payload.pop('showBirthDate')
+
+    response = api_client.post('/auth/register', payload, format='json')
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'showBirthDate' in response.json()
+
+
 def test_login_and_refresh_reject_invalid_data(api_client, user):
     bad_login = api_client.post(
         '/auth/login',
@@ -84,7 +94,7 @@ def test_login_and_refresh_reject_invalid_data(api_client, user):
     assert bad_refresh.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_me_get_patch_privacy_and_delete(auth_client, user):
+def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     get_response = auth_client.get('/me')
     assert get_response.status_code == status.HTTP_200_OK
     assert get_response.json()['isCurrentUser'] is True
@@ -102,6 +112,7 @@ def test_me_get_patch_privacy_and_delete(auth_client, user):
                 'title': 'SPb',
             },
             'interests': ['music'],
+            'showBirthDate': True,
         },
         format='json',
     )
@@ -109,6 +120,8 @@ def test_me_get_patch_privacy_and_delete(auth_client, user):
     assert patch_response.status_code == status.HTTP_200_OK
     assert user.name == 'Updated'
     assert user.city_settlement == 'Saint Petersburg'
+    assert user.show_birth_date is True
+    assert patch_response.json()['showBirthDate'] is True
 
     delete_response = auth_client.delete('/me')
     user.refresh_from_db()
@@ -117,19 +130,6 @@ def test_me_get_patch_privacy_and_delete(auth_client, user):
     assert user.deleted_at is not None
 
 
-def test_user_detail_respects_privacy(api_client, user_factory):
-    viewer = user_factory()
-    hidden = user_factory(show_gender=False, show_city=False, show_interests=False)
-    api_client.force_authenticate(user=viewer)
-
-    response = api_client.get(f'/users/{hidden.id}')
-
-    assert response.status_code == status.HTTP_200_OK
-    body = response.json()
-    assert body['gender'] is None
-    assert body['city'] is None
-    assert body['interests'] is None
-    assert body['isCurrentUser'] is False
 
 
 def test_user_history_my_activities_rating_and_attendance(

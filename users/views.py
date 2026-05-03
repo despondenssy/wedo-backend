@@ -16,7 +16,6 @@ from .serializers import (
     RegisterSerializer,
     LoginSerializer,
     UpdateMeSerializer,
-    UpdatePrivacySerializer,
     UserProfileSerializer,
 )
 
@@ -99,18 +98,6 @@ class MeView(APIView):
         user.is_active = False
         user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class MePrivacyView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def patch(self, request):
-        serializer = UpdatePrivacySerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer.update(request.user, serializer.validated_data)
-        return Response(request.user.privacy)
 
 
 class UserDetailView(APIView):
