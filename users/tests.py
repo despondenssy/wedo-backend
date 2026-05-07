@@ -79,6 +79,36 @@ def test_register_requires_show_birth_date(api_client):
     assert 'showBirthDate' in response.json()
 
 
+def test_register_rejects_short_password(api_client):
+    payload = register_payload()
+    payload['password'] = 'Abc12'  # 5 символов — короче минимума 8
+
+    response = api_client.post('/auth/register', payload, format='json')
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'password' in response.json()
+
+
+def test_register_rejects_numeric_only_password(api_client):
+    payload = register_payload()
+    payload['password'] = '12345678'  # только цифры — NumericPasswordValidator
+
+    response = api_client.post('/auth/register', payload, format='json')
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'password' in response.json()
+
+
+def test_register_rejects_common_password(api_client):
+    payload = register_payload()
+    payload['password'] = 'password'  # из списка топ-распространённых — CommonPasswordValidator
+
+    response = api_client.post('/auth/register', payload, format='json')
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'password' in response.json()
+
+
 def test_login_and_refresh_reject_invalid_data(api_client, user):
     bad_login = api_client.post(
         '/auth/login',
@@ -217,6 +247,47 @@ def test_qr_scan_requires_organizer(auth_client, user, other_user, activity_fact
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_qr_resolve_rejects_used_token(api_client, user, other_user, qr_token_factory):
+    used = qr_token_factory(
+        user=user,
+        token='qr:used',
+        used_at=timezone.now(),
+    )
+    api_client.force_authenticate(user=other_user)
+
+    response = api_client.post('/qr-tokens/resolve', {'token': used.token}, format='json')
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'TOKEN_USED'
+
+
+def test_qr_scan_rejects_used_token(
+    api_client,
+    user,
+    other_user,
+    activity_factory,
+    participation_factory,
+    qr_token_factory,
+):
+    activity = activity_factory(organizer=other_user)
+    participation_factory(activity, user, status=Participation.Status.ACCEPTED)
+    used = qr_token_factory(
+        user=user,
+        token='qr:scan-used',
+        used_at=timezone.now(),
+    )
+    api_client.force_authenticate(user=other_user)
+
+    response = api_client.post(
+        f'/activities/{activity.id}/attendance/scan',
+        {'token': used.token},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'TOKEN_USED'
 
 
 def test_protected_user_endpoint_requires_auth(api_client, user):

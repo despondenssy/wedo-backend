@@ -11,6 +11,16 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 
+@pytest.fixture(autouse=True)
+def _clear_throttle_cache():
+    # rate limiting хранит счётчики в Django cache;
+    # без очистки они переживают между тестами и ломают флоу
+    from django.core.cache import cache
+    cache.clear()
+    yield
+    cache.clear()
+
+
 @pytest.fixture
 def api_client():
     return APIClient()

@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password as django_validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 User = get_user_model()
 
@@ -14,13 +16,26 @@ class CitySerializer(serializers.Serializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
     city = CitySerializer()
     show_birth_date = serializers.BooleanField(required=True)
 
     class Meta:
         model = User
         fields = ['name', 'email', 'password', 'birth_date', 'gender', 'city', 'interests', 'show_birth_date']
+
+    def validate_password(self, value):
+        # прогоняем через AUTH_PASSWORD_VALIDATORS из settings:
+        # минимальная длина, общие пароли, только-цифры, похожесть на email/имя
+        temp_user = User(
+            email=self.initial_data.get('email', ''),
+            name=self.initial_data.get('name', ''),
+        )
+        try:
+            django_validate_password(value, user=temp_user)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
 
     def create(self, validated_data):
         city_data = validated_data.pop('city')

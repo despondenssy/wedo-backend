@@ -158,6 +158,30 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FileUploadParser',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        # общие лимиты для всех endpoint'ов
+        'anon': '60/min',
+        'user': '600/min',
+        # точечные лимиты для чувствительных endpoint'ов (ScopedRateThrottle)
+        'login': '10/min',
+        'register': '5/hour',
+        'refresh': '20/min',
+        'qr_issue': '30/min',
+        'qr_resolve': '30/min',
+        'qr_scan': '60/min',
+    },
+}
+
+# DRF throttling использует Django cache. Для prod лучше Redis.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'wedo-cache',
+    }
 }
 
 from datetime import timedelta

@@ -21,6 +21,7 @@ media/
 .idea/
 .vs/
 *.cursor
+.claude/
 
 # Tests
 .pytest_cache/

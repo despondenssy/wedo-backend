@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.shortcuts import get_object_or_404
@@ -39,6 +40,8 @@ def get_tokens(user):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -54,6 +57,8 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -174,6 +179,8 @@ class UserHistoryView(APIView):
 class QrTokenView(APIView):
     """POST /me/qr-token — получить или обновить свой QR-токен."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'qr_issue'
 
     def post(self, request):
         # токен живёт 1 минуту — короткий TTL для безопасности
@@ -198,6 +205,8 @@ class QrTokenView(APIView):
 class QrTokenResolveView(APIView):
     """POST /qr-tokens/resolve — расшифровать QR-токен и получить данные пользователя."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'qr_resolve'
 
     def post(self, request):
         token_str = request.data.get('token')
@@ -211,8 +220,14 @@ class QrTokenResolveView(APIView):
             qr_token = QrToken.objects.select_related('user').get(token=token_str)
         except QrToken.DoesNotExist:
             return Response(
-                {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден или уже использован'}},
+                {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден'}},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if qr_token.used_at is not None:
+            return Response(
+                {'error': {'code': 'TOKEN_USED', 'message': 'Токен уже использован'}},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if qr_token.is_expired:
@@ -231,6 +246,8 @@ class QrTokenResolveView(APIView):
 class QrAttendanceScanView(APIView):
     """POST /activities/:id/attendance/scan — отметить посещение через QR."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'qr_scan'
 
     def post(self, request, activity_id):
         from activities.models import Activity
@@ -258,6 +275,12 @@ class QrAttendanceScanView(APIView):
             return Response(
                 {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден'}},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if qr_token.used_at is not None:
+            return Response(
+                {'error': {'code': 'TOKEN_USED', 'message': 'Токен уже использован'}},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if qr_token.is_expired:
@@ -331,6 +354,8 @@ class LogoutView(APIView):
 class RefreshTokenView(APIView):
     """POST /auth/refresh — получить новый access токен по refresh токену."""
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'refresh'
 
     def post(self, request):
         refresh_token = request.data.get('refresh_token')
