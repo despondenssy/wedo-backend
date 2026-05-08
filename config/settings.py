@@ -196,3 +196,35 @@ AUTH_USER_MODEL = 'users.User'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Celery
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # жёсткий потолок 30 минут на задачу
+
+# периодические задачи — выполняются Celery beat'ом
+CELERY_BEAT_SCHEDULE = {
+    # каждые 5 минут — найти активности которые начнутся через ~час и
+    # отправить участникам напоминание
+    'send-activity-reminders': {
+        'task': 'notifications.tasks.send_activity_reminders',
+        'schedule': 300.0,
+    },
+    # каждые 5 минут — после окончания активности попросить участников
+    # оставить оценку
+    'send-rate-requests': {
+        'task': 'notifications.tasks.send_rate_requests',
+        'schedule': 300.0,
+    },
+    # каждые 10 минут — для окончившихся активностей перевести
+    # accepted-участников в missed (если QR не отсканировали)
+    'mark-unscanned-as-missed': {
+        'task': 'notifications.tasks.mark_unscanned_as_missed',
+        'schedule': 600.0,
+    },
+}

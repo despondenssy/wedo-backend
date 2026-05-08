@@ -17,6 +17,45 @@ from .serializers import (
 )
 
 
+# статусы участия, которые считаются "активными"
+_ACTIVE_PARTICIPATION_STATUSES = ('pending', 'accepted', 'attended')
+
+
+def _aggregate_participations(activity_ids):
+    """
+    Один SQL-запрос вместо N. Считает участников и pending-заявки
+    для всех переданных активностей и возвращает удобные словари.
+
+    Используется и сериализатором (через context) для отображения,
+    и алгоритмом рекомендаций для вычисления скоров.
+    """
+    from participation.models import Participation
+
+    rows = Participation.objects.filter(
+        activity_id__in=activity_ids,
+        status__in=_ACTIVE_PARTICIPATION_STATUSES,
+    ).values_list('activity_id', 'user_id', 'status')
+
+    # реальные участники для UI: accepted + attended
+    real_count = {aid: 0 for aid in activity_ids}
+    # pending-заявки для значка организатору
+    pending_count = {aid: 0 for aid in activity_ids}
+    # все активные участия — для расчёта популярности
+    total_count = {aid: 0 for aid in activity_ids}
+    # set участников для расчёта похожести (Jaccard)
+    participant_ids = {aid: set() for aid in activity_ids}
+
+    for activity_id, user_id, status in rows:
+        total_count[activity_id] += 1
+        participant_ids[activity_id].add(user_id)
+        if status in ('accepted', 'attended'):
+            real_count[activity_id] += 1
+        elif status == 'pending':
+            pending_count[activity_id] += 1
+
+    return real_count, pending_count, total_count, participant_ids
+
+
 class ActivityListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -89,8 +128,19 @@ class ActivityListView(APIView):
 
         next_cursor = str(items[-1].id) if has_more else None
 
+        # один батчевый запрос вместо N+1 в сериализаторе
+        real_count, pending_count, _, _ = _aggregate_participations([a.id for a in items])
+
         return Response({
-            'items': ActivityListItemSerializer(items, many=True).data,
+            'items': ActivityListItemSerializer(
+                items,
+                many=True,
+                context={
+                    'request': request,
+                    'participants_counts': real_count,
+                    'pending_counts': pending_count,
+                },
+            ).data,
             'next_cursor': next_cursor,
             'has_more': has_more,
         })
@@ -102,6 +152,11 @@ class ActivityListView(APIView):
 
         activity = serializer.save()
         create_feed_event(request.user, activity, 'created')
+
+        # уведомление подписчикам организатора — в фоне, чтобы не задерживать ответ
+        from notifications.tasks import notify_followers_of_new_activity
+        notify_followers_of_new_activity.delay(activity.id)
+
         return Response(
             ActivityDetailSerializer(activity).data,
             status=status.HTTP_201_CREATED,
@@ -209,9 +264,6 @@ class RecommendedActivitiesView(APIView):
     # расстояние, дальше которого вклад от близости уже 0
     D_MAX_KM = 200.0
 
-    # активные статусы участия
-    ACTIVE_STATUSES = ('pending', 'accepted', 'attended')
-
     def get(self, request):
         from participation.models import Participation
         from subscriptions.models import Subscription
@@ -236,7 +288,7 @@ class RecommendedActivitiesView(APIView):
         # исключаем события к которым пользователь уже присоединился или организовал
         already_joined = Participation.objects.filter(
             user=user,
-            status__in=self.ACTIVE_STATUSES,
+            status__in=_ACTIVE_PARTICIPATION_STATUSES,
         ).values_list('activity_id', flat=True)
         queryset = queryset.exclude(id__in=already_joined).exclude(organizer=user)
 
@@ -254,19 +306,12 @@ class RecommendedActivitiesView(APIView):
 
         # === ОДНОРАЗОВЫЕ БАТЧИ — вместо запросов в цикле ===
 
-        # 1 запрос: участники всех кандидатов одним махом.
-        # одновременно считаем n(e) для популярности и собираем set участников для Jaccard
-        participations = Participation.objects.filter(
-            activity_id__in=candidate_ids,
-            status__in=self.ACTIVE_STATUSES,
-        ).values_list('activity_id', 'user_id')
-
-        counts = {aid: 0 for aid in candidate_ids}
-        participants_per_activity = {aid: set() for aid in candidate_ids}
-        for activity_id, user_id in participations:
-            counts[activity_id] += 1
-            participants_per_activity[activity_id].add(user_id)
-        n_max = max(counts.values()) if counts.values() else 1
+        # 1 запрос: считаем сразу всё про участия — реальное число для UI,
+        # pending для организатора, total для скоринга, set участников для Jaccard
+        real_count, pending_count, total_count, participants_per_activity = (
+            _aggregate_participations(candidate_ids)
+        )
+        n_max = max(total_count.values()) if total_count.values() else 1
 
         # 1 запрос: id организаторов, на которых подписан пользователь
         followed_organizer_ids = set(
@@ -291,7 +336,7 @@ class RecommendedActivitiesView(APIView):
                 activity,
                 user,
                 n_max=n_max,
-                participants_count=counts.get(activity.id, 0),
+                participants_count=total_count.get(activity.id, 0),
                 participant_ids=participants_per_activity.get(activity.id, set()),
                 followed_organizer_ids=followed_organizer_ids,
                 similar_users=similar_users,
@@ -305,7 +350,15 @@ class RecommendedActivitiesView(APIView):
         next_cursor = str(items[-1].id) if has_more and items else None
 
         return Response({
-            'items': ActivityListItemSerializer(items, many=True).data,
+            'items': ActivityListItemSerializer(
+                items,
+                many=True,
+                context={
+                    'request': request,
+                    'participants_counts': real_count,
+                    'pending_counts': pending_count,
+                },
+            ).data,
             'next_cursor': next_cursor,
             'has_more': has_more,
         })

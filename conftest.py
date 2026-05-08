@@ -21,6 +21,23 @@ def _clear_throttle_cache():
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def _eager_celery_tasks(settings):
+    # в тестах нет смысла гонять Redis и worker — пусть таски выполняются
+    # синхронно прямо в тесте. так мы реально проверяем их побочные эффекты.
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.CELERY_TASK_EAGER_PROPAGATES = True
+
+
+@pytest.fixture(autouse=True)
+def _stub_firebase_push(monkeypatch):
+    # тесты не должны стучаться в FCM — без этой заглушки
+    # send_push_to_user попытается инициализировать Firebase и упадёт
+    def _noop(user, title, body, data=None):
+        return None
+    monkeypatch.setattr('notifications.firebase.send_push_to_user', _noop)
+
+
 @pytest.fixture
 def api_client():
     return APIClient()

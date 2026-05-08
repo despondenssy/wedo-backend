@@ -4,6 +4,7 @@ CacheControl==0.14.4
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.7
+celery==5.4.0
 cryptography==46.0.7
 Django==6.0.4
 django-filter==25.2
@@ -42,6 +43,7 @@ PyJWT==2.12.1
 pytest==9.0.2
 pytest-django==4.11.1
 python-dotenv==1.2.2
+redis==5.0.8
 requests==2.33.1
 sqlparse==0.5.5
 typing_extensions==4.15.0

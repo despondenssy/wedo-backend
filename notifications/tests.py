@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import pytest
 from django.utils import timezone
 from rest_framework import status
 
 from notifications.models import DeviceToken, Notification
+from participation.models import Participation
 
 
 pytestmark = pytest.mark.django_db
@@ -68,3 +71,154 @@ def test_device_token_create_update_and_validation(auth_client, user, other_user
 def test_notifications_endpoint_requires_auth(api_client):
     response = api_client.get('/me/notifications')
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ============================================================================
+# Тесты для Celery-задач уведомлений
+# ============================================================================
+
+
+def test_notify_followers_of_new_activity_creates_notifications_only_for_subscribers(
+    user_factory,
+    activity_factory,
+    subscription_factory,
+):
+    from notifications.tasks import notify_followers_of_new_activity
+
+    organizer = user_factory()
+    follower = user_factory()
+    not_follower = user_factory()
+    subscription_factory(follower=follower, target=organizer)
+
+    activity = activity_factory(organizer=organizer, title='Йога на закате')
+
+    notify_followers_of_new_activity(activity.id)
+
+    # подписчик получил уведомление
+    assert Notification.objects.filter(
+        user=follower,
+        type=Notification.Type.SOCIAL,
+        activity=activity,
+    ).exists()
+    # неподписчик — нет
+    assert not Notification.objects.filter(user=not_follower).exists()
+
+
+def test_notify_organizer_of_new_rating_creates_notification(
+    user, activity_factory, participation_factory, rating_factory,
+):
+    from notifications.tasks import notify_organizer_of_new_rating
+
+    activity = activity_factory()  # organizer = свежий user из factory
+    participation_factory(activity, user, status=Participation.Status.ATTENDED)
+    rating = rating_factory(activity, user, rating=4, comment='Norm')
+
+    notify_organizer_of_new_rating(rating.id)
+
+    notif = Notification.objects.get(
+        user=activity.organizer,
+        type=Notification.Type.SOCIAL,
+        activity=activity,
+    )
+    assert '4/5' in notif.message
+
+
+def test_send_activity_reminders_sends_once_to_accepted_participants(
+    user_factory, activity_factory, participation_factory,
+):
+    from notifications.tasks import send_activity_reminders
+
+    # активность начнётся через ~час — попадает в окно [55; 65] мин
+    in_an_hour = timezone.now() + timedelta(minutes=60)
+    activity = activity_factory(
+        start_at=in_an_hour,
+        end_at=in_an_hour + timedelta(hours=2),
+    )
+
+    accepted = user_factory()
+    pending = user_factory()
+    rejected = user_factory()
+    participation_factory(activity, accepted, status=Participation.Status.ACCEPTED)
+    participation_factory(activity, pending, status=Participation.Status.PENDING)
+    participation_factory(activity, rejected, status=Participation.Status.REJECTED)
+
+    send_activity_reminders()
+
+    # accepted получил
+    assert Notification.objects.filter(
+        user=accepted, type=Notification.Type.REMINDER, activity=activity,
+    ).exists()
+    # pending и rejected — нет
+    assert not Notification.objects.filter(user=pending).exists()
+    assert not Notification.objects.filter(user=rejected).exists()
+
+    # повторный вызов не плодит дубли
+    send_activity_reminders()
+    assert Notification.objects.filter(
+        user=accepted, type=Notification.Type.REMINDER, activity=activity,
+    ).count() == 1
+
+
+def test_send_rate_requests_skips_users_who_already_rated(
+    user_factory, activity_factory, participation_factory, rating_factory,
+):
+    from notifications.tasks import send_rate_requests
+
+    # активность только что закончилась
+    just_ended = activity_factory(
+        start_at=timezone.now() - timedelta(hours=2),
+        end_at=timezone.now() - timedelta(minutes=2),
+    )
+
+    rated_user = user_factory()
+    not_rated_user = user_factory()
+    participation_factory(just_ended, rated_user, status=Participation.Status.ATTENDED)
+    participation_factory(just_ended, not_rated_user, status=Participation.Status.ATTENDED)
+    rating_factory(just_ended, rated_user, rating=5)
+
+    send_rate_requests()
+
+    # тот, кто ещё не оценил — получает запрос
+    assert Notification.objects.filter(
+        user=not_rated_user, type=Notification.Type.RATE_REQUEST,
+    ).exists()
+    # тот, кто уже оценил — не получает
+    assert not Notification.objects.filter(
+        user=rated_user, type=Notification.Type.RATE_REQUEST,
+    ).exists()
+
+
+def test_mark_unscanned_as_missed_updates_only_accepted_for_ended_activities(
+    user_factory, activity_factory, participation_factory,
+):
+    from notifications.tasks import mark_unscanned_as_missed
+
+    # активность закончилась 10 минут назад
+    ended = activity_factory(
+        start_at=timezone.now() - timedelta(hours=2),
+        end_at=timezone.now() - timedelta(minutes=10),
+    )
+    accepted_user = user_factory()
+    attended_user = user_factory()
+    p_accepted = participation_factory(ended, accepted_user, status=Participation.Status.ACCEPTED)
+    p_attended = participation_factory(ended, attended_user, status=Participation.Status.ATTENDED)
+
+    # активность ещё идёт — не должно тронуться
+    ongoing = activity_factory(
+        start_at=timezone.now() - timedelta(minutes=10),
+        end_at=timezone.now() + timedelta(hours=1),
+    )
+    ongoing_user = user_factory()
+    p_ongoing = participation_factory(ongoing, ongoing_user, status=Participation.Status.ACCEPTED)
+
+    mark_unscanned_as_missed()
+
+    p_accepted.refresh_from_db()
+    p_attended.refresh_from_db()
+    p_ongoing.refresh_from_db()
+
+    assert p_accepted.status == Participation.Status.MISSED
+    # attended не трогаем — у них всё ок
+    assert p_attended.status == Participation.Status.ATTENDED
+    # активность ещё идёт — не трогаем
+    assert p_ongoing.status == Participation.Status.ACCEPTED

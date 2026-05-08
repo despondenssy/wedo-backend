@@ -80,6 +80,106 @@ def test_recommended_excludes_joined_and_organizer_activities(
     assert str(own.id) not in ids
 
 
+def test_recommended_orders_by_score(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    subscription_factory,
+):
+    """
+    Snapshot-тест: фиксирует ожидаемый порядок выдачи рекомендаций
+    при известных входах. Если формула или веса поменяются — тест упадёт.
+
+    Сценарий:
+    - пользователь с интересом 'football'
+    - три активности, отличающиеся ровно одним сигналом:
+        A — точное совпадение интереса (subcategory='football') → I=1.0
+        B — организатор, на которого подписан → S=1.0
+        C — нейтральная, без сигналов
+    - все находятся далеко (G=0), без участников (B=0, P=0)
+
+    Скоры по формуле:
+        A = 0.33 * 1.0 = 0.33
+        B = 0.25 * 1.0 = 0.25
+        C = 0.0
+    Ожидаем: A → B → C
+    """
+    user.interests = ['football']
+    user.city_settlement = ''
+    user.city_region = ''
+    user.city_country = ''
+    user.city_latitude = 55.75
+    user.city_longitude = 37.61
+    user.save()
+
+    other_organizer = user_factory()
+    followed_organizer = user_factory()
+    subscription_factory(follower=user, target=followed_organizer)
+
+    # все активности далеко (география не даёт буст)
+    far_lat, far_lng = 10.0, 10.0
+    a = activity_factory(
+        organizer=other_organizer,
+        category_id='sport', subcategory_id='football',
+        location_latitude=far_lat, location_longitude=far_lng,
+        location_settlement='', location_region='', location_country='',
+    )
+    b = activity_factory(
+        organizer=followed_organizer,
+        category_id='music', subcategory_id='guitar',
+        location_latitude=far_lat, location_longitude=far_lng,
+        location_settlement='', location_region='', location_country='',
+    )
+    c = activity_factory(
+        organizer=other_organizer,
+        category_id='music', subcategory_id='guitar',
+        location_latitude=far_lat, location_longitude=far_lng,
+        location_settlement='', location_region='', location_country='',
+    )
+
+    response = auth_client.get('/activities/recommended?limit=10')
+
+    assert response.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in response.json()['items']]
+    # все три кандидата в выдаче
+    assert {str(a.id), str(b.id), str(c.id)}.issubset(set(ids))
+    # фиксируем точный порядок по score: A > B > C
+    assert ids.index(str(a.id)) < ids.index(str(b.id)) < ids.index(str(c.id))
+
+
+def test_recommended_query_count_does_not_scale_with_candidates(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    django_assert_max_num_queries,
+):
+    """
+    Регресс-тест на оптимизацию: число SQL-запросов в /activities/recommended
+    не должно расти с количеством кандидатов. До оптимизации для 30 кандидатов
+    было ~360 запросов (по запросу на каждый сигнал на каждого кандидата).
+    После — должно быть около 5-7 (батчами).
+    """
+    user.interests = ['football']
+    user.save()
+
+    organizers = [user_factory() for _ in range(3)]
+    for i in range(30):
+        activity_factory(
+            organizer=organizers[i % 3],
+            category_id='sport',
+            subcategory_id='football',
+        )
+
+    # с запасом ставим 12 — фактическое число должно быть около 5-7.
+    # если этот тест упал — значит где-то снова вылез N+1.
+    with django_assert_max_num_queries(12):
+        response = auth_client.get('/activities/recommended?limit=30')
+
+    assert response.status_code == status.HTTP_200_OK
+
+
 def test_saved_activities_crud(auth_client, user, activity_factory):
     activity = activity_factory()
 

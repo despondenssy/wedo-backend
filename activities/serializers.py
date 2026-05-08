@@ -52,16 +52,25 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
         return obj.preferences
 
     def get_participants_count(self, obj):
-        from participation.models import Participation
-        count = Participation.objects.filter(
-            activity=obj,
-            status__in=['accepted', 'attended'],
-        ).count()
+        # если view передал предсобранный счётчик через context — используем его
+        # (это убирает N+1 при сериализации списков)
+        precomputed = self.context.get('participants_counts')
+        if precomputed is not None:
+            count = precomputed.get(obj.id, 0)
+        else:
+            from participation.models import Participation
+            count = Participation.objects.filter(
+                activity=obj,
+                status__in=['accepted', 'attended'],
+            ).count()
         if obj.organizer_id:
             count += 1
         return count
 
     def get_pending_requests_count(self, obj):
+        precomputed = self.context.get('pending_counts')
+        if precomputed is not None:
+            return precomputed.get(obj.id, 0)
         from participation.models import Participation
         return Participation.objects.filter(
             activity=obj,
