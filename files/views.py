@@ -52,22 +52,8 @@ class FileUploadView(APIView):
 
         return Response(FileSerializer(file_obj).data, status=status.HTTP_201_CREATED)
 
-    def get(self, request):
-        ids = request.query_params.get('ids', '')
-        if not ids:
-            return Response(
-                {'error': {'code': 'BAD_REQUEST', 'message': 'ids обязателен'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        id_list = [i.strip() for i in ids.split(',') if i.strip()]
-        files = File.objects.filter(id__in=id_list)
-
-        return Response({'items': FileSerializer(files, many=True).data})
-
 
 class FileDetailView(APIView):
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, file_id):
         file = get_object_or_404(File, id=file_id)

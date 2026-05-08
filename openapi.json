@@ -1565,23 +1565,6 @@
       }
     },
     "/files": {
-      "get": {
-        "tags": ["files"],
-        "summary": "Get files by ids",
-        "parameters": [
-          { "name": "ids", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Comma-separated file ids" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Files list",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/FilesResponse" }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "tags": ["files"],
         "summary": "Upload image file",
@@ -1615,6 +1598,7 @@
       "get": {
         "tags": ["files"],
         "summary": "Get file binary",
+        "security": [],
         "parameters": [
           { "name": "file_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],

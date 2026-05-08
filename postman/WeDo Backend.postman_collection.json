@@ -865,13 +865,6 @@
           }
         },
         {
-          "name": "List Files By IDs",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/files?ids={{file_id}}"
-          }
-        },
-        {
           "name": "Download File",
           "request": {
             "method": "GET",
