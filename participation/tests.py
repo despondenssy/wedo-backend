@@ -59,11 +59,11 @@ def test_join_request_list_cancel_approve_and_reject(
 ):
     activity = activity_factory(organizer=other_user, requires_approval=True)
     api_client.force_authenticate(user=user)
-    requested = api_client.post(f'/activities/{activity.id}/join-requests', {}, format='json')
+    requested = api_client.post(f'/activities/{activity.id}/join-requests/me', {}, format='json')
     assert requested.status_code == status.HTTP_204_NO_CONTENT
     send_notification.assert_called_once()
 
-    duplicate = api_client.post(f'/activities/{activity.id}/join-requests', {}, format='json')
+    duplicate = api_client.post(f'/activities/{activity.id}/join-requests/me', {}, format='json')
     assert duplicate.status_code == status.HTTP_400_BAD_REQUEST
 
     cancelled = api_client.delete(f'/activities/{activity.id}/join-requests/me')
@@ -165,4 +165,100 @@ def test_manual_attendance_requires_organizer_and_user_id(
 
 def test_participation_endpoint_requires_auth(api_client, activity):
     response = api_client.post(f'/activities/{activity.id}/join', {}, format='json')
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_join_requests_list_organizer_sees_pending(
+    auth_client,
+    user,
+    other_user,
+    activity_factory,
+    participation_factory,
+):
+    """Организатор видит список pending заявок."""
+    activity = activity_factory(organizer=user, requires_approval=True)
+    participation_factory(activity, other_user, status=Participation.Status.PENDING)
+
+    response = auth_client.get(f'/activities/{activity.id}/join-requests')
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data['items']) == 1
+    assert data['items'][0]['user']['id'] == str(other_user.id)
+    assert data['items'][0]['participation_status'] == 'pending'
+    assert data['has_more'] is False
+    assert data['next_cursor'] is None
+
+
+def test_join_requests_list_non_organizer_forbidden(
+    api_client,
+    user,
+    other_user,
+    activity_factory,
+    participation_factory,
+):
+    """Не-организатор получает 403."""
+    activity = activity_factory(organizer=other_user, requires_approval=True)
+    participation_factory(activity, user, status=Participation.Status.PENDING)
+    api_client.force_authenticate(user=user)
+
+    response = api_client.get(f'/activities/{activity.id}/join-requests')
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()['error']['code'] == 'FORBIDDEN'
+
+
+def test_join_requests_list_empty(
+    auth_client,
+    user,
+    activity_factory,
+):
+    """Нет pending заявок — пустой список."""
+    activity = activity_factory(organizer=user)
+
+    response = auth_client.get(f'/activities/{activity.id}/join-requests')
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data['items'] == []
+    assert data['has_more'] is False
+    assert data['next_cursor'] is None
+
+
+def test_join_requests_list_pagination(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    participation_factory,
+):
+    """Cursor-пагинация: limit работает, has_more и next_cursor возвращаются."""
+    activity = activity_factory(organizer=user, requires_approval=True)
+    for _ in range(5):
+        participant = user_factory()
+        participation_factory(activity, participant, status=Participation.Status.PENDING)
+
+    response = auth_client.get(f'/activities/{activity.id}/join-requests', {'limit': 2})
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data['items']) == 2
+    assert data['has_more'] is True
+    assert data['next_cursor'] is not None
+
+    # Долистываем до конца
+    while data['next_cursor']:
+        response = auth_client.get(
+            f'/activities/{activity.id}/join-requests',
+            {'limit': 2, 'cursor': data['next_cursor']},
+        )
+        data = response.json()
+    assert len(data['items']) <= 2
+    assert data['has_more'] is False
+    assert data['next_cursor'] is None
+
+
+def test_join_requests_list_requires_auth(api_client, activity):
+    """Без аутентификации — 401."""
+    response = api_client.get(f'/activities/{activity.id}/join-requests')
     assert response.status_code == status.HTTP_401_UNAUTHORIZED

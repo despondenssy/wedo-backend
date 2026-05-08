@@ -1157,23 +1157,33 @@
     "/activities/{activity_id}/join-requests": {
       "get": {
         "tags": ["participation"],
-        "summary": "List join requests",
+        "summary": "List pending join requests (organizer only)",
         "parameters": [
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
           { "name": "cursor", "in": "query", "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "Join requests page",
+            "description": "Cursor-paginated list of pending join requests",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ActivityJoinRequestsResponse" }
               }
             }
+          },
+          "403": {
+            "description": "Only the organizer can view join requests",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
           }
         }
-      },
+      }
+    },
+    "/activities/{activity_id}/join-requests/me": {
       "post": {
         "tags": ["participation"],
         "summary": "Create join request",
@@ -1183,9 +1193,7 @@
         "responses": {
           "204": { "description": "Success" }
         }
-      }
-    },
-    "/activities/{activity_id}/join-requests/me": {
+      },
       "delete": {
         "tags": ["participation"],
         "summary": "Cancel own join request",

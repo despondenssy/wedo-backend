@@ -82,8 +82,8 @@ class ActivityJoinView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ActivityJoinRequestView(APIView):
-    """POST /activities/:id/join-requests — подать заявку с подтверждением."""
+class ActivityRequestMeView(APIView):
+    """POST/DELETE /activities/:id/join-requests/me — подать / отменить заявку."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, activity_id):
@@ -117,11 +117,6 @@ class ActivityJoinRequestView(APIView):
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ActivityJoinRequestCancelView(APIView):
-    """DELETE /activities/:id/join-requests/me — отменить свою заявку."""
-    permission_classes = [IsAuthenticated]
 
     def delete(self, request, activity_id):
         participation = get_object_or_404(
