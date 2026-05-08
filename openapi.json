@@ -1150,7 +1150,23 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "204": { "description": "Success" }
+          "204": { "description": "Success" },
+          "400": {
+            "description": "Activity requires approval, already joined, or activity is full",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Organizer cannot join their own activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
         }
       }
     },
@@ -1214,7 +1230,23 @@
           { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "204": { "description": "Success" }
+          "204": { "description": "Success" },
+          "400": {
+            "description": "Activity is full",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the organizer can approve requests",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
         }
       }
     },

@@ -14,6 +14,7 @@ def test_join_success_duplicate_requires_approval_full_and_organizer_forbidden(
     auth_client,
     user,
     other_user,
+    user_factory,
     activity_factory,
     participation_factory,
 ):
@@ -42,8 +43,10 @@ def test_join_success_duplicate_requires_approval_full_and_organizer_forbidden(
     approval_response = auth_client.post(f'/activities/{approval.id}/join', {}, format='json')
     assert approval_response.status_code == status.HTTP_400_BAD_REQUEST
 
-    full = activity_factory(organizer=other_user, pref_max_participants=1)
-    participation_factory(full, other_user, status=Participation.Status.ACCEPTED)
+    # pref_max_participants=2: организатор занимает 1 место, ещё 1 участник — мест нет
+    full = activity_factory(organizer=other_user, pref_max_participants=2)
+    another_user = user_factory()
+    participation_factory(full, another_user, status=Participation.Status.ACCEPTED)
     full_response = auth_client.post(f'/activities/{full.id}/join', {}, format='json')
     assert full_response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -104,6 +107,32 @@ def test_approve_reject_require_organizer(api_client, user, other_user, activity
 
     assert approve.status_code == status.HTTP_403_FORBIDDEN
     assert reject.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_approve_rejects_when_full(
+    api_client,
+    user,
+    other_user,
+    user_factory,
+    activity_factory,
+    participation_factory,
+):
+    """Одобрение заявки отклоняется, если нет свободных мест с учётом организатора."""
+    activity = activity_factory(organizer=other_user, requires_approval=True, pref_max_participants=2)
+    # организатор (other_user) занимает 1 место, ещё 1 участник — мест нет
+    another_user = user_factory()
+    participation_factory(activity, another_user, status=Participation.Status.ACCEPTED)
+    participation_factory(activity, user, status=Participation.Status.PENDING)
+
+    api_client.force_authenticate(user=other_user)
+    response = api_client.post(
+        f'/activities/{activity.id}/join-requests/{user.id}/approve',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'ACTIVITY_FULL'
 
 
 def test_participants_leave_and_manual_attendance(

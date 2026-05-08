@@ -55,6 +55,8 @@ class ActivityJoinView(APIView):
             accepted_count = activity.participations.filter(
                 status__in=[Participation.Status.ACCEPTED, Participation.Status.ATTENDED]
             ).count()
+            if activity.organizer_id:
+                accepted_count += 1
             if accepted_count >= activity.pref_max_participants:
                 return Response(
                     {'error': {'code': 'ACTIVITY_FULL', 'message': 'Нет свободных мест'}},
@@ -167,6 +169,19 @@ class ActivityJoinRequestApproveView(APIView):
             user_id=user_id,
             status=Participation.Status.PENDING,
         )
+
+        if activity.pref_max_participants:
+            accepted_count = activity.participations.filter(
+                status__in=[Participation.Status.ACCEPTED, Participation.Status.ATTENDED]
+            ).count()
+            if activity.organizer_id:
+                accepted_count += 1
+            if accepted_count >= activity.pref_max_participants:
+                return Response(
+                    {'error': {'code': 'ACTIVITY_FULL', 'message': 'Нет свободных мест'}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         participation.status = Participation.Status.ACCEPTED
         participation.save()
 

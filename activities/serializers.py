@@ -53,10 +53,13 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
 
     def get_participants_count(self, obj):
         from participation.models import Participation
-        return Participation.objects.filter(
+        count = Participation.objects.filter(
             activity=obj,
             status__in=['accepted', 'attended'],
         ).count()
+        if obj.organizer_id:
+            count += 1
+        return count
 
     def get_pending_requests_count(self, obj):
         from participation.models import Participation
