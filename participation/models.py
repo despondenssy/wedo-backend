@@ -29,6 +29,12 @@ class Participation(models.Model):
         db_table = 'participations'
         # один пользователь — одна запись на активность
         unique_together = [['activity', 'user']]
+        indexes = [
+            # /me/my-activities, /users/:id/history: фильтр по user + status
+            models.Index(fields=['user', 'status']),
+            # /activities/:id/participants, /join-requests, capacity checks: фильтр по activity + status
+            models.Index(fields=['activity', 'status']),
+        ]
 
     def __str__(self):
         return f'{self.user} → {self.activity} ({self.status})'

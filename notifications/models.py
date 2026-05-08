@@ -41,6 +41,12 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notifications'
         ordering = ['-created_at']
+        indexes = [
+            # /me/notifications: основная сортировка
+            models.Index(fields=['user', '-created_at']),
+            # фильтр unreadOnly=true
+            models.Index(fields=['user', 'read_at']),
+        ]
 
     def __str__(self):
         return f'{self.user} — {self.title}'

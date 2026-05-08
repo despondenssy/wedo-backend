@@ -66,6 +66,14 @@ class Activity(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Activity'
         verbose_name_plural = 'Activities'
+        indexes = [
+            # /activities и /activities/recommended фильтруют по статусу + времени старта
+            models.Index(fields=['status', 'start_at']),
+            # фильтрация по категории — частая операция в ленте и фильтрах
+            models.Index(fields=['category_id']),
+            # геофильтрация по городу — основная стратегия рекомендаций
+            models.Index(fields=['location_settlement']),
+        ]
 
     def __str__(self):
         return self.title
@@ -113,6 +121,10 @@ class SavedActivity(models.Model):
     class Meta:
         db_table = 'saved_activities'
         unique_together = [['user', 'activity']]
+        indexes = [
+            # /me/saved-activities сортируется по saved_at desc, фильтр по user
+            models.Index(fields=['user', '-saved_at']),
+        ]
 
     def __str__(self):
         return f'{self.user} → {self.activity}'
@@ -153,6 +165,10 @@ class UserActivityFeedEvent(models.Model):
     class Meta:
         db_table = 'user_activity_feed_events'
         ordering = ['-occurred_at']
+        indexes = [
+            # /me/activity-feed и /users/:id/activity-feed: фильтр по user, сортировка по occurred_at desc
+            models.Index(fields=['user', '-occurred_at']),
+        ]
 
     def __str__(self):
         return f'{self.user} — {self.type} — {self.activity}'
