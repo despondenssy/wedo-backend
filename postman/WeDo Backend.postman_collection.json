@@ -1,8 +1,8 @@
-{
+﻿{
   "info": {
     "_postman_id": "8cc1727b-4c2c-4df4-9d0c-27bc3ce3570a",
     "name": "WeDo Backend",
-    "description": "Manual Postman collection for testing the WeDo Backend API. Import together with the WeDo Local environment. Run Auth/Register or Auth/Login first so protected requests can use {{accessToken}}.",
+    "description": "Manual Postman collection for testing the WeDo Backend API. Import together with the WeDo Local environment. Run Auth/Register or Auth/Login first so protected requests can use {{access_token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -10,7 +10,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{accessToken}}",
+        "value": "{{access_token}}",
         "type": "string"
       }
     ]
@@ -42,12 +42,12 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json.tokens) {",
-                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
-                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "  pm.environment.set('access_token', json.tokens.access_token);",
+                  "  pm.environment.set('refresh_token', json.tokens.refresh_token);",
                   "}",
                   "if (json.user && json.user.id) {",
-                  "  pm.environment.set('userId', json.user.id);",
-                  "  pm.environment.set('targetUserId', json.user.id);",
+                  "  pm.environment.set('user_id', json.user.id);",
+                  "  pm.environment.set('target_user_id', json.user.id);",
                   "}"
                 ]
               }
@@ -66,7 +66,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"showBirthDate\": false\n}"
+              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"show_birth_date\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -81,12 +81,12 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json.user && json.user.id) {",
-                  "  pm.environment.set('otherUserId', json.user.id);",
-                  "  pm.environment.set('targetUserId', json.user.id);",
+                  "  pm.environment.set('other_user_id', json.user.id);",
+                  "  pm.environment.set('target_user_id', json.user.id);",
                   "}",
                   "if (json.tokens) {",
-                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
-                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "  pm.environment.set('access_token', json.tokens.access_token);",
+                  "  pm.environment.set('refresh_token', json.tokens.refresh_token);",
                   "}"
                 ]
               }
@@ -105,7 +105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\",\n  \"birthDate\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"],\n  \"showBirthDate\": false\n}"
+              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{other_email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"],\n  \"show_birth_date\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -120,11 +120,11 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json.tokens) {",
-                  "  pm.environment.set('accessToken', json.tokens.accessToken);",
-                  "  pm.environment.set('refreshToken', json.tokens.refreshToken);",
+                  "  pm.environment.set('access_token', json.tokens.access_token);",
+                  "  pm.environment.set('refresh_token', json.tokens.refresh_token);",
                   "}",
                   "if (json.user && json.user.id) {",
-                  "  pm.environment.set('userId', json.user.id);",
+                  "  pm.environment.set('user_id', json.user.id);",
                   "}"
                 ]
               }
@@ -177,8 +177,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.environment.set('accessToken', json.accessToken);",
-                  "if (json.refreshToken) pm.environment.set('refreshToken', json.refreshToken);"
+                  "if (json.access_token) pm.environment.set('access_token', json.access_token);",
+                  "if (json.refresh_token) pm.environment.set('refresh_token', json.refresh_token);"
                 ]
               }
             }
@@ -196,7 +196,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
             },
             "url": "{{baseUrl}}/auth/refresh"
           }
@@ -233,7 +233,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
             },
             "url": "{{baseUrl}}/auth/logout"
           }
@@ -262,7 +262,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"],\n  \"showBirthDate\": true\n}"
+              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"],\n  \"show_birth_date\": true\n}"
             },
             "url": "{{baseUrl}}/me"
           }
@@ -283,7 +283,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.token) pm.environment.set('qrToken', json.token);"
+                  "if (json.token) pm.environment.set('qr_token', json.token);"
                 ]
               }
             }
@@ -305,7 +305,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"{{qrToken}}\"\n}"
+              "raw": "{\n  \"token\": \"{{qr_token}}\"\n}"
             },
             "url": "{{baseUrl}}/qr-tokens/resolve"
           }
@@ -321,35 +321,35 @@
           "name": "Get User",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/users/{{targetUserId}}"
+            "url": "{{baseUrl}}/users/{{target_user_id}}"
           }
         },
         {
           "name": "User History",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/users/{{targetUserId}}/history?tab=created&limit=20"
+            "url": "{{baseUrl}}/users/{{target_user_id}}/history?tab=created&limit=20"
           }
         },
         {
           "name": "User Rating",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/users/{{targetUserId}}/rating"
+            "url": "{{baseUrl}}/users/{{target_user_id}}/rating"
           }
         },
         {
           "name": "User Attendance History",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/users/{{targetUserId}}/attendance-history"
+            "url": "{{baseUrl}}/users/{{target_user_id}}/attendance-history"
           }
         },
         {
           "name": "User Activity Feed",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/users/{{targetUserId}}/activity-feed?category=organizer&limit=20"
+            "url": "{{baseUrl}}/users/{{target_user_id}}/activity-feed?category=organizer&limit=20"
           }
         }
       ]
@@ -361,7 +361,7 @@
           "name": "List Activities",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities?citySettlement=Moscow&categoryId=sport&limit=30"
+            "url": "{{baseUrl}}/activities?city_settlement=Moscow&category_id=sport&limit=30"
           }
         },
         {
@@ -373,7 +373,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.id) pm.environment.set('activityId', json.id);"
+                  "if (json.id) pm.environment.set('activity_id', json.id);"
                 ]
               }
             }
@@ -388,7 +388,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Evening Football\",\n  \"description\": \"Friendly training session for students.\",\n  \"categoryId\": \"sport\",\n  \"subcategoryId\": \"football\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Red Square, Moscow\",\n    \"name\": \"City Center\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"startAt\": \"2026-05-20T17:00:00Z\",\n  \"endAt\": \"2026-05-20T19:00:00Z\",\n  \"timeZone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"ageFrom\": 18,\n    \"ageTo\": 35,\n    \"level\": \"beginner\",\n    \"maxParticipants\": 10\n  },\n  \"requiresApproval\": false,\n  \"photoFileIds\": [],\n  \"price\": \"0.00\"\n}"
+              "raw": "{\n  \"title\": \"Evening Football\",\n  \"description\": \"Friendly training session for students.\",\n  \"category_id\": \"sport\",\n  \"subcategory_id\": \"football\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Red Square, Moscow\",\n    \"name\": \"City Center\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"start_at\": \"2026-05-20T17:00:00Z\",\n  \"end_at\": \"2026-05-20T19:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"age_from\": 18,\n    \"age_to\": 35,\n    \"level\": \"beginner\",\n    \"max_participants\": 10\n  },\n  \"requires_approval\": false,\n  \"photo_file_ids\": [],\n  \"price\": \"0.00\"\n}"
             },
             "url": "{{baseUrl}}/activities"
           }
@@ -402,7 +402,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.id) pm.environment.set('activityId', json.id);"
+                  "if (json.id) pm.environment.set('activity_id', json.id);"
                 ]
               }
             }
@@ -417,7 +417,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Closed Workshop\",\n  \"description\": \"Activity with manual approval.\",\n  \"categoryId\": \"education\",\n  \"subcategoryId\": \"workshop\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Moscow\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"startAt\": \"2026-05-25T15:00:00Z\",\n  \"endAt\": \"2026-05-25T17:00:00Z\",\n  \"timeZone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"maxParticipants\": 5\n  },\n  \"requiresApproval\": true,\n  \"photoFileIds\": [],\n  \"price\": \"100.00\"\n}"
+              "raw": "{\n  \"title\": \"Closed Workshop\",\n  \"description\": \"Activity with manual approval.\",\n  \"category_id\": \"education\",\n  \"subcategory_id\": \"workshop\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Moscow\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"start_at\": \"2026-05-25T15:00:00Z\",\n  \"end_at\": \"2026-05-25T17:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"max_participants\": 5\n  },\n  \"requires_approval\": true,\n  \"photo_file_ids\": [],\n  \"price\": \"100.00\"\n}"
             },
             "url": "{{baseUrl}}/activities"
           }
@@ -426,7 +426,7 @@
           "name": "Get Activity",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities/{{activityId}}"
+            "url": "{{baseUrl}}/activities/{{activity_id}}"
           }
         },
         {
@@ -441,23 +441,23 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated Activity Title\",\n  \"price\": \"50.00\",\n  \"preferences\": {\n    \"maxParticipants\": 12\n  }\n}"
+              "raw": "{\n  \"title\": \"Updated Activity Title\",\n  \"price\": \"50.00\",\n  \"preferences\": {\n    \"max_participants\": 12\n  }\n}"
             },
-            "url": "{{baseUrl}}/activities/{{activityId}}"
+            "url": "{{baseUrl}}/activities/{{activity_id}}"
           }
         },
         {
           "name": "Delete Activity",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/activities/{{activityId}}"
+            "url": "{{baseUrl}}/activities/{{activity_id}}"
           }
         },
         {
           "name": "Cancel Activity",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/activities/{{activityId}}/cancel"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/cancel"
           }
         },
         {
@@ -479,7 +479,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"activities\": [\n    {\n      \"title\": \"Batch Activity 1\",\n      \"description\": \"Created from Postman batch request.\",\n      \"categoryId\": \"sport\",\n      \"subcategoryId\": \"running\",\n      \"format\": \"offline\",\n      \"location\": {\n        \"latitude\": 55.75,\n        \"longitude\": 37.61,\n        \"address\": \"Moscow\",\n        \"settlement\": \"Moscow\",\n        \"region\": \"Moscow\",\n        \"country\": \"Russia\"\n      },\n      \"startAt\": \"2026-06-01T10:00:00Z\",\n      \"endAt\": \"2026-06-01T12:00:00Z\",\n      \"timeZone\": \"Europe/Moscow\",\n      \"requiresApproval\": false,\n      \"photoFileIds\": [],\n      \"price\": \"0.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"activities\": [\n    {\n      \"title\": \"Batch Activity 1\",\n      \"description\": \"Created from Postman batch request.\",\n      \"category_id\": \"sport\",\n      \"subcategory_id\": \"running\",\n      \"format\": \"offline\",\n      \"location\": {\n        \"latitude\": 55.75,\n        \"longitude\": 37.61,\n        \"address\": \"Moscow\",\n        \"settlement\": \"Moscow\",\n        \"region\": \"Moscow\",\n        \"country\": \"Russia\"\n      },\n      \"start_at\": \"2026-06-01T10:00:00Z\",\n      \"end_at\": \"2026-06-01T12:00:00Z\",\n      \"time_zone\": \"Europe/Moscow\",\n      \"requires_approval\": false,\n      \"photo_file_ids\": [],\n      \"price\": \"0.00\"\n    }\n  ]\n}"
             },
             "url": "{{baseUrl}}/activities/batch"
           }
@@ -495,21 +495,21 @@
           "name": "Save Activity",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+            "url": "{{baseUrl}}/me/saved-activities/{{activity_id}}"
           }
         },
         {
           "name": "Save Activity Duplicate",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+            "url": "{{baseUrl}}/me/saved-activities/{{activity_id}}"
           }
         },
         {
           "name": "Remove Saved Activity",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/me/saved-activities/{{activityId}}"
+            "url": "{{baseUrl}}/me/saved-activities/{{activity_id}}"
           }
         },
         {
@@ -528,56 +528,56 @@
           "name": "Join Activity",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join"
           }
         },
         {
           "name": "Create Join Request",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join-requests"
           }
         },
         {
           "name": "List Join Requests",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests?limit=20"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join-requests?limit=20"
           }
         },
         {
           "name": "Cancel My Join Request",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/me"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join-requests/me"
           }
         },
         {
           "name": "Approve Join Request",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/{{targetUserId}}/approve"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join-requests/{{target_user_id}}/approve"
           }
         },
         {
           "name": "Reject Join Request",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/activities/{{activityId}}/join-requests/{{targetUserId}}/reject"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/join-requests/{{target_user_id}}/reject"
           }
         },
         {
           "name": "List Participants",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities/{{activityId}}/participants?limit=30"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/participants?limit=30"
           }
         },
         {
           "name": "Leave Activity",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/activities/{{activityId}}/participants/me"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/participants/me"
           }
         },
         {
@@ -592,9 +592,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+              "raw": "{\n  \"user_id\": \"{{target_user_id}}\"\n}"
             },
-            "url": "{{baseUrl}}/activities/{{activityId}}/attendance"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/attendance"
           }
         },
         {
@@ -609,9 +609,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"{{qrToken}}\"\n}"
+              "raw": "{\n  \"token\": \"{{qr_token}}\"\n}"
             },
-            "url": "{{baseUrl}}/activities/{{activityId}}/attendance/scan"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/attendance/scan"
           }
         }
       ]
@@ -629,7 +629,7 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json.items && json.items.length > 0) {",
-                  "  pm.environment.set('notificationId', json.items[0].id);",
+                  "  pm.environment.set('notification_id', json.items[0].id);",
                   "}"
                 ]
               }
@@ -644,7 +644,7 @@
           "name": "List Unread Request Notifications",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/me/notifications?unreadOnly=true&type=request&limit=30"
+            "url": "{{baseUrl}}/me/notifications?unread_only=true&type=request&limit=30"
           }
         },
         {
@@ -661,14 +661,14 @@
               "mode": "raw",
               "raw": "{\n  \"read\": true\n}"
             },
-            "url": "{{baseUrl}}/notifications/{{notificationId}}"
+            "url": "{{baseUrl}}/notifications/{{notification_id}}"
           }
         },
         {
           "name": "Delete Notification",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/notifications/{{notificationId}}"
+            "url": "{{baseUrl}}/notifications/{{notification_id}}"
           }
         },
         {
@@ -704,7 +704,7 @@
           "name": "List Activity Ratings",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities/{{activityId}}/ratings?limit=20"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/ratings?limit=20"
           }
         },
         {
@@ -721,7 +721,7 @@
               "mode": "raw",
               "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great activity from Postman.\"\n}"
             },
-            "url": "{{baseUrl}}/activities/{{activityId}}/ratings"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/ratings"
           }
         },
         {
@@ -738,7 +738,7 @@
               "mode": "raw",
               "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Expected negative scenario.\"\n}"
             },
-            "url": "{{baseUrl}}/activities/{{activityId}}/ratings"
+            "url": "{{baseUrl}}/activities/{{activity_id}}/ratings"
           }
         }
       ]
@@ -772,7 +772,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+              "raw": "{\n  \"user_id\": \"{{target_user_id}}\"\n}"
             },
             "url": "{{baseUrl}}/subscriptions"
           }
@@ -789,7 +789,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
+              "raw": "{\n  \"user_id\": \"{{target_user_id}}\"\n}"
             },
             "url": "{{baseUrl}}/subscriptions"
           }
@@ -806,16 +806,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"isPinned\": true\n}"
+              "raw": "{\n  \"is_pinned\": true\n}"
             },
-            "url": "{{baseUrl}}/subscriptions/{{targetUserId}}"
+            "url": "{{baseUrl}}/subscriptions/{{target_user_id}}"
           }
         },
         {
           "name": "Delete Subscription",
           "request": {
             "method": "DELETE",
-            "url": "{{baseUrl}}/subscriptions/{{targetUserId}}"
+            "url": "{{baseUrl}}/subscriptions/{{target_user_id}}"
           }
         }
       ]
@@ -832,7 +832,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.id) pm.environment.set('fileId', json.id);"
+                  "if (json.id) pm.environment.set('file_id', json.id);"
                 ]
               }
             }
@@ -868,14 +868,14 @@
           "name": "List Files By IDs",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/files?ids={{fileId}}"
+            "url": "{{baseUrl}}/files?ids={{file_id}}"
           }
         },
         {
           "name": "Download File",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/files/{{fileId}}"
+            "url": "{{baseUrl}}/files/{{file_id}}"
           }
         }
       ]
@@ -907,3 +907,5 @@
     }
   ]
 }
+
+

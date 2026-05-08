@@ -23,11 +23,11 @@ class SubscriptionsListView(APIView):
             follower=request.user,
         ).select_related('target')
 
-        pinned_only = request.query_params.get('pinnedOnly')
+        pinned_only = request.query_params.get('pinned_only')
         if pinned_only == 'true':
             queryset = queryset.filter(is_pinned=True)
 
-        sort = request.query_params.get('sort', 'subscribedAt')
+        sort = request.query_params.get('sort', 'subscribed_at')
         if sort == 'name':
             queryset = queryset.order_by('target__name')
         else:

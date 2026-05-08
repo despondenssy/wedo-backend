@@ -27,7 +27,7 @@ def _send_notification(user, notification_type, title, message, activity, reques
         action_required=notification_type == 'request',
     )
     send_push_to_user(user, title, message, data={
-        'activityId': str(activity.id),
+        'activity_id': str(activity.id),
         'type': notification_type,
     })
 
@@ -154,7 +154,7 @@ class ActivityLeaveView(APIView):
 
 
 class ActivityJoinRequestApproveView(APIView):
-    """POST /activities/:id/join-requests/:userId/approve — одобрить заявку."""
+    """POST /activities/:id/join-requests/:user_id/approve — одобрить заявку."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, activity_id, user_id):
@@ -188,7 +188,7 @@ class ActivityJoinRequestApproveView(APIView):
 
 
 class ActivityJoinRequestRejectView(APIView):
-    """POST /activities/:id/join-requests/:userId/reject — отклонить заявку."""
+    """POST /activities/:id/join-requests/:user_id/reject — отклонить заявку."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, activity_id, user_id):
@@ -309,7 +309,7 @@ class ActivityAttendanceView(APIView):
         user_id = request.data.get('user_id')
         if not user_id:
             return Response(
-                {'error': {'code': 'BAD_REQUEST', 'message': 'userId обязателен'}},
+                {'error': {'code': 'BAD_REQUEST', 'message': 'user_id обязателен'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

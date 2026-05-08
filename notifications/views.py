@@ -15,7 +15,7 @@ class NotificationsListView(APIView):
     def get(self, request):
         queryset = Notification.objects.filter(user=request.user)
 
-        unread_only = request.query_params.get('unreadOnly')
+        unread_only = request.query_params.get('unread_only')
         type_ = request.query_params.get('type')
 
         if unread_only == 'true':

@@ -23,19 +23,19 @@ class ActivityListView(APIView):
         queryset = Activity.objects.filter(status=Activity.Status.ACTIVE)
 
         # фильтрация
-        category_id = request.query_params.get('categoryId')
-        subcategory_id = request.query_params.get('subcategoryId')
+        category_id = request.query_params.get('category_id')
+        subcategory_id = request.query_params.get('subcategory_id')
         format_ = request.query_params.get('format')
         city = request.query_params.get('city')
-        date_from = request.query_params.get('dateFrom')
-        date_to = request.query_params.get('dateTo')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
         level = request.query_params.get('level')
         gender = request.query_params.get('gender')
-        age_from = request.query_params.get('ageFrom')
-        age_to = request.query_params.get('ageTo')
-        requires_approval = request.query_params.get('requiresApproval')
-        only_available = request.query_params.get('onlyAvailable')
-        price_to = request.query_params.get('priceTo')
+        age_from = request.query_params.get('age_from')
+        age_to = request.query_params.get('age_to')
+        requires_approval = request.query_params.get('requires_approval')
+        only_available = request.query_params.get('only_available')
+        price_to = request.query_params.get('price_to')
 
         if category_id:
             queryset = queryset.filter(category_id=category_id)
@@ -45,9 +45,9 @@ class ActivityListView(APIView):
             queryset = queryset.filter(format=format_)
 
         # трёхуровневая геолокация: city содержит settlement, region, country
-        city_settlement = request.query_params.get('citySettlement') or city
-        city_region = request.query_params.get('cityRegion')
-        city_country = request.query_params.get('cityCountry')
+        city_settlement = request.query_params.get('city_settlement') or city
+        city_region = request.query_params.get('city_region')
+        city_country = request.query_params.get('city_country')
 
         if city_settlement:
             queryset = queryset.filter(location_settlement__icontains=city_settlement)

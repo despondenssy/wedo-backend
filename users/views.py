@@ -361,7 +361,7 @@ class RefreshTokenView(APIView):
         refresh_token = request.data.get('refresh_token')
         if not refresh_token:
             return Response(
-                {'error': {'code': 'BAD_REQUEST', 'message': 'refreshToken обязателен'}},
+                {'error': {'code': 'BAD_REQUEST', 'message': 'refresh_token обязателен'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

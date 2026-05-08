@@ -123,7 +123,7 @@ def test_participants_leave_and_manual_attendance(
 
     attended = api_client.post(
         f'/activities/{activity.id}/attendance',
-        {'userId': user.id},
+        {'user_id': user.id},
         format='json',
     )
     participation.refresh_from_db()
@@ -156,7 +156,7 @@ def test_manual_attendance_requires_organizer_and_user_id(
 ):
     activity = activity_factory(organizer=other_user)
 
-    forbidden = auth_client.post(f'/activities/{activity.id}/attendance', {'userId': user.id}, format='json')
+    forbidden = auth_client.post(f'/activities/{activity.id}/attendance', {'user_id': user.id}, format='json')
     missing_user = auth_client.post(f'/activities/{activity.id}/attendance', {}, format='json')
 
     assert forbidden.status_code == status.HTTP_403_FORBIDDEN

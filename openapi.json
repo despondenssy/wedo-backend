@@ -1,4 +1,4 @@
-{
+﻿{
   "openapi": "3.0.3",
   "info": {
     "title": "WeDo Backend API",
@@ -61,7 +61,7 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "avatarFileId": { "type": "string", "nullable": true },
+          "avatar_file_id": { "type": "string", "nullable": true },
           "rating": { "type": "number" }
         },
         "required": ["id", "name", "rating"]
@@ -78,44 +78,44 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "avatarFileId": { "type": "string", "nullable": true },
+          "avatar_file_id": { "type": "string", "nullable": true },
           "rating": { "type": "number" },
           "age": { "type": "integer", "nullable": true },
           "gender": { "type": "string", "nullable": true },
-          "showBirthDate": { "type": "boolean" },
+          "show_birth_date": { "type": "boolean" },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" }, "nullable": true },
-          "attendanceHistory": { "allOf": [{ "$ref": "#/components/schemas/AttendanceHistory" }], "nullable": true },
-          "reviewsPreview": {
+          "attendance_history": { "allOf": [{ "$ref": "#/components/schemas/AttendanceHistory" }], "nullable": true },
+          "reviews_preview": {
             "type": "array",
             "nullable": true,
             "items": {
               "type": "object",
               "properties": {
                 "id": { "type": "string" },
-                "fromUserId": { "type": "string" },
-                "fromUserName": { "type": "string" },
+                "from_user_id": { "type": "string" },
+                "from_user_name": { "type": "string" },
                 "rating": { "type": "number" },
                 "text": { "type": "string" },
                 "date": { "type": "string", "format": "date-time" },
-                "activityId": { "type": "string" }
+                "activity_id": { "type": "string" }
               },
-              "required": ["id", "fromUserId", "fromUserName", "rating", "text", "date", "activityId"]
+              "required": ["id", "from_user_id", "from_user_name", "rating", "text", "date", "activity_id"]
             }
           },
-          "isCurrentUser": { "type": "boolean" },
-          "isSubscribed": { "type": "boolean", "nullable": true }
+          "is_current_user": { "type": "boolean" },
+          "is_subscribed": { "type": "boolean", "nullable": true }
         },
-        "required": ["id", "name", "rating", "showBirthDate", "isCurrentUser"]
+        "required": ["id", "name", "rating", "show_birth_date", "is_current_user"]
       },
       "AuthTokens": {
         "type": "object",
         "properties": {
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "access_token": { "type": "string" },
+          "refresh_token": { "type": "string" },
+          "expires_at": { "type": "string", "format": "date-time" }
         },
-        "required": ["accessToken", "refreshToken", "expiresAt"]
+        "required": ["access_token", "refresh_token", "expires_at"]
       },
       "AuthResponse": {
         "type": "object",
@@ -131,13 +131,13 @@
           "name": { "type": "string" },
           "email": { "type": "string", "format": "email" },
           "password": { "type": "string", "minLength": 6 },
-          "birthDate": { "type": "string", "format": "date" },
+          "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
-          "showBirthDate": { "type": "boolean" }
+          "show_birth_date": { "type": "boolean" }
         },
-        "required": ["name", "email", "password", "birthDate", "gender", "city", "showBirthDate"]
+        "required": ["name", "email", "password", "birth_date", "gender", "city", "show_birth_date"]
       },
       "LoginRequest": {
         "type": "object",
@@ -151,12 +151,12 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
-          "avatarFileId": { "type": "integer", "nullable": true },
-          "birthDate": { "type": "string", "format": "date" },
+          "avatar_file_id": { "type": "integer", "nullable": true },
+          "birth_date": { "type": "string", "format": "date" },
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
-          "showBirthDate": { "type": "boolean" }
+          "show_birth_date": { "type": "boolean" }
         }
       },
       "QrTokenResolveRequest": {
@@ -170,17 +170,17 @@
         "type": "object",
         "properties": {
           "token": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "expires_at": { "type": "string", "format": "date-time" }
         },
-        "required": ["token", "expiresAt"]
+        "required": ["token", "expires_at"]
       },
       "QrTokenResolveResponse": {
         "type": "object",
         "properties": {
           "user": { "$ref": "#/components/schemas/UserSnippet" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "expires_at": { "type": "string", "format": "date-time" }
         },
-        "required": ["user", "expiresAt"]
+        "required": ["user", "expires_at"]
       },
       "ActivityLocation": {
         "type": "object",
@@ -199,10 +199,10 @@
         "type": "object",
         "properties": {
           "gender": { "type": "string", "enum": ["male", "female"], "nullable": true },
-          "ageFrom": { "type": "integer", "nullable": true },
-          "ageTo": { "type": "integer", "nullable": true },
+          "age_from": { "type": "integer", "nullable": true },
+          "age_to": { "type": "integer", "nullable": true },
           "level": { "type": "string", "enum": ["beginner", "intermediate", "advanced"], "nullable": true },
-          "maxParticipants": { "type": "integer", "nullable": true }
+          "max_participants": { "type": "integer", "nullable": true }
         }
       },
       "ActivityListItem": {
@@ -210,24 +210,24 @@
         "properties": {
           "id": { "type": "string" },
           "title": { "type": "string" },
-          "startAt": { "type": "string", "format": "date-time" },
-          "endAt": { "type": "string", "format": "date-time" },
+          "start_at": { "type": "string", "format": "date-time" },
+          "end_at": { "type": "string", "format": "date-time" },
           "format": { "type": "string", "enum": ["online", "offline"] },
           "status": { "type": "string", "enum": ["active", "cancelled"] },
           "location": { "$ref": "#/components/schemas/ActivityLocation" },
-          "categoryId": { "type": "string" },
-          "subcategoryId": { "type": "string", "nullable": true },
-          "coverPhotoFileId": { "type": "string", "nullable": true },
-          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "category_id": { "type": "string" },
+          "subcategory_id": { "type": "string", "nullable": true },
+          "cover_photo_file_id": { "type": "string", "nullable": true },
+          "photo_file_ids": { "type": "array", "items": { "type": "string" } },
           "organizer": { "$ref": "#/components/schemas/UserSnippet" },
-          "participantsCount": { "type": "integer" },
-          "maxParticipants": { "type": "integer", "nullable": true },
-          "requiresApproval": { "type": "boolean" },
+          "participants_count": { "type": "integer" },
+          "max_participants": { "type": "integer", "nullable": true },
+          "requires_approval": { "type": "boolean" },
           "preferences": { "allOf": [{ "$ref": "#/components/schemas/ActivityPreferences" }], "nullable": true },
-          "pendingRequestsCount": { "type": "integer", "nullable": true },
+          "pending_requests_count": { "type": "integer", "nullable": true },
           "price": { "type": "number" }
         },
-        "required": ["id", "title", "startAt", "endAt", "format", "status", "location", "categoryId", "photoFileIds", "organizer", "participantsCount", "requiresApproval", "price"]
+        "required": ["id", "title", "start_at", "end_at", "format", "status", "location", "category_id", "photo_file_ids", "organizer", "participants_count", "requires_approval", "price"]
       },
       "ActivityDetail": {
         "allOf": [
@@ -236,27 +236,27 @@
             "type": "object",
             "properties": {
               "description": { "type": "string" },
-              "timeZone": { "type": "string" },
-              "participantsPreview": { "type": "array", "items": { "$ref": "#/components/schemas/UserSnippet" } },
-              "isSaved": { "type": "boolean" },
-              "participationStatus": { "type": "string", "nullable": true },
-              "isFull": { "type": "boolean" },
-              "spotsLeft": { "type": "integer", "nullable": true },
-              "policyFlags": {
+              "time_zone": { "type": "string" },
+              "participants_preview": { "type": "array", "items": { "$ref": "#/components/schemas/UserSnippet" } },
+              "is_saved": { "type": "boolean" },
+              "participation_status": { "type": "string", "nullable": true },
+              "is_full": { "type": "boolean" },
+              "spots_left": { "type": "integer", "nullable": true },
+              "policy_flags": {
                 "type": "object",
                 "properties": {
-                  "canJoin": { "type": "boolean" },
-                  "canLeave": { "type": "boolean" },
-                  "canCancelRequest": { "type": "boolean" },
-                  "canManageRequests": { "type": "boolean" },
-                  "canRate": { "type": "boolean" },
-                  "canEdit": { "type": "boolean" },
-                  "canCancelActivity": { "type": "boolean" }
+                  "can_join": { "type": "boolean" },
+                  "can_leave": { "type": "boolean" },
+                  "can_cancel_request": { "type": "boolean" },
+                  "can_manage_requests": { "type": "boolean" },
+                  "can_rate": { "type": "boolean" },
+                  "can_edit": { "type": "boolean" },
+                  "can_cancel_activity": { "type": "boolean" }
                 },
-                "required": ["canJoin", "canLeave", "canCancelRequest", "canManageRequests", "canRate", "canEdit", "canCancelActivity"]
+                "required": ["can_join", "can_leave", "can_cancel_request", "can_manage_requests", "can_rate", "can_edit", "can_cancel_activity"]
               }
             },
-            "required": ["description", "timeZone", "participantsPreview", "isSaved", "isFull", "policyFlags"]
+            "required": ["description", "time_zone", "participants_preview", "is_saved", "is_full", "policy_flags"]
           }
         ]
       },
@@ -264,29 +264,29 @@
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityListItem" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "CreateActivityRequest": {
         "type": "object",
         "properties": {
           "title": { "type": "string" },
           "description": { "type": "string" },
-          "categoryId": { "type": "string" },
-          "subcategoryId": { "type": "string", "nullable": true },
+          "category_id": { "type": "string" },
+          "subcategory_id": { "type": "string", "nullable": true },
           "format": { "type": "string", "enum": ["online", "offline"] },
           "location": { "$ref": "#/components/schemas/ActivityLocation" },
-          "startAt": { "type": "string", "format": "date-time" },
-          "endAt": { "type": "string", "format": "date-time" },
-          "timeZone": { "type": "string" },
+          "start_at": { "type": "string", "format": "date-time" },
+          "end_at": { "type": "string", "format": "date-time" },
+          "time_zone": { "type": "string" },
           "preferences": { "$ref": "#/components/schemas/ActivityPreferences" },
-          "requiresApproval": { "type": "boolean" },
-          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "requires_approval": { "type": "boolean" },
+          "photo_file_ids": { "type": "array", "items": { "type": "string" } },
           "price": { "type": "string" }
         },
-        "required": ["title", "description", "categoryId", "format", "location", "startAt", "endAt", "price"]
+        "required": ["title", "description", "category_id", "format", "location", "start_at", "end_at", "price"]
       },
       "UpdateActivityRequest": {
         "type": "object",
@@ -295,12 +295,12 @@
           "description": { "type": "string" },
           "format": { "type": "string", "enum": ["online", "offline"] },
           "location": { "$ref": "#/components/schemas/ActivityLocation" },
-          "startAt": { "type": "string", "format": "date-time" },
-          "endAt": { "type": "string", "format": "date-time" },
-          "timeZone": { "type": "string" },
+          "start_at": { "type": "string", "format": "date-time" },
+          "end_at": { "type": "string", "format": "date-time" },
+          "time_zone": { "type": "string" },
           "preferences": { "$ref": "#/components/schemas/ActivityPreferences" },
-          "requiresApproval": { "type": "boolean" },
-          "photoFileIds": { "type": "array", "items": { "type": "string" } },
+          "requires_approval": { "type": "boolean" },
+          "photo_file_ids": { "type": "array", "items": { "type": "string" } },
           "price": { "type": "string" },
           "status": { "type": "string", "enum": ["active", "cancelled"] }
         }
@@ -309,45 +309,45 @@
         "type": "object",
         "properties": {
           "user": { "$ref": "#/components/schemas/UserSnippet" },
-          "participationStatus": { "type": "string" },
-          "joinedAt": { "type": "string", "format": "date-time" },
-          "isOrganizer": { "type": "boolean" }
+          "participation_status": { "type": "string" },
+          "joined_at": { "type": "string", "format": "date-time" },
+          "is_organizer": { "type": "boolean" }
         },
-        "required": ["user", "participationStatus", "joinedAt", "isOrganizer"]
+        "required": ["user", "participation_status", "joined_at", "is_organizer"]
       },
       "ActivityParticipantsResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityParticipant" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "ActivityJoinRequest": {
         "type": "object",
         "properties": {
           "user": { "$ref": "#/components/schemas/UserSnippet" },
-          "participationStatus": { "type": "string" },
-          "requestCreatedAt": { "type": "string", "format": "date-time" }
+          "participation_status": { "type": "string" },
+          "request_created_at": { "type": "string", "format": "date-time" }
         },
-        "required": ["user", "participationStatus", "requestCreatedAt"]
+        "required": ["user", "participation_status", "request_created_at"]
       },
       "ActivityJoinRequestsResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityJoinRequest" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "AttendanceMarkRequest": {
         "type": "object",
         "properties": {
-          "userId": { "type": "integer" }
+          "user_id": { "type": "integer" }
         },
-        "required": ["userId"]
+        "required": ["user_id"]
       },
       "Notification": {
         "type": "object",
@@ -358,21 +358,21 @@
           "message": { "type": "string" },
           "timestamp": { "type": "string", "format": "date-time" },
           "read": { "type": "boolean" },
-          "activityId": { "type": "string", "nullable": true },
-          "requestUserId": { "type": "string", "nullable": true },
-          "actionRequired": { "type": "boolean" },
-          "activityTitle": { "type": "string", "nullable": true }
+          "activity_id": { "type": "string", "nullable": true },
+          "request_user_id": { "type": "string", "nullable": true },
+          "action_required": { "type": "boolean" },
+          "activity_title": { "type": "string", "nullable": true }
         },
-        "required": ["id", "type", "title", "message", "timestamp", "read", "actionRequired"]
+        "required": ["id", "type", "title", "message", "timestamp", "read", "action_required"]
       },
       "NotificationsResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "UpdateNotificationRequest": {
         "type": "object",
@@ -395,18 +395,18 @@
           "user": { "$ref": "#/components/schemas/UserSnippet" },
           "rating": { "type": "integer" },
           "comment": { "type": "string", "nullable": true },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "created_at": { "type": "string", "format": "date-time" }
         },
-        "required": ["id", "user", "rating", "createdAt"]
+        "required": ["id", "user", "rating", "created_at"]
       },
       "ActivityRatingsResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityRating" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "CreateActivityRatingRequest": {
         "type": "object",
@@ -419,69 +419,69 @@
       "Subscription": {
         "type": "object",
         "properties": {
-          "userId": { "type": "string" },
-          "subscribedAt": { "type": "string", "format": "date-time" },
-          "isPinned": { "type": "boolean" },
+          "user_id": { "type": "string" },
+          "subscribed_at": { "type": "string", "format": "date-time" },
+          "is_pinned": { "type": "boolean" },
           "user": { "$ref": "#/components/schemas/UserSnippet" }
         },
-        "required": ["userId", "subscribedAt", "isPinned", "user"]
+        "required": ["user_id", "subscribed_at", "is_pinned", "user"]
       },
       "SubscriptionsResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/Subscription" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       },
       "CreateSubscriptionRequest": {
         "type": "object",
         "properties": {
-          "userId": { "type": "integer" }
+          "user_id": { "type": "integer" }
         },
-        "required": ["userId"]
+        "required": ["user_id"]
       },
       "CreateSubscriptionResponse": {
         "type": "object",
         "properties": {
-          "userId": { "type": "string" },
-          "subscribedAt": { "type": "string", "format": "date-time" },
-          "isPinned": { "type": "boolean" }
+          "user_id": { "type": "string" },
+          "subscribed_at": { "type": "string", "format": "date-time" },
+          "is_pinned": { "type": "boolean" }
         },
-        "required": ["userId", "subscribedAt", "isPinned"]
+        "required": ["user_id", "subscribed_at", "is_pinned"]
       },
       "UpdateSubscriptionRequest": {
         "type": "object",
         "properties": {
-          "isPinned": { "type": "boolean" }
+          "is_pinned": { "type": "boolean" }
         }
       },
       "SubscriptionDeleteResponse": {
         "type": "object",
         "properties": {
-          "userId": { "type": "string" },
+          "user_id": { "type": "string" },
           "deleted": { "type": "boolean" }
         },
-        "required": ["userId", "deleted"]
+        "required": ["user_id", "deleted"]
       },
       "SubscriptionUpdateResponse": {
         "type": "object",
         "properties": {
-          "userId": { "type": "string" },
-          "isPinned": { "type": "boolean" }
+          "user_id": { "type": "string" },
+          "is_pinned": { "type": "boolean" }
         },
-        "required": ["userId", "isPinned"]
+        "required": ["user_id", "is_pinned"]
       },
       "File": {
         "type": "object",
         "properties": {
           "id": { "type": "string" },
-          "originalName": { "type": "string" },
-          "mimeType": { "type": "string" },
+          "original_name": { "type": "string" },
+          "mime_type": { "type": "string" },
           "size": { "type": "integer" }
         },
-        "required": ["id", "originalName", "mimeType", "size"]
+        "required": ["id", "original_name", "mime_type", "size"]
       },
       "FilesResponse": {
         "type": "object",
@@ -494,24 +494,24 @@
         "type": "object",
         "properties": {
           "id": { "type": "string" },
-          "userId": { "type": "string" },
-          "activityId": { "type": "string" },
+          "user_id": { "type": "string" },
+          "activity_id": { "type": "string" },
           "type": { "type": "string", "enum": ["created", "attended", "rated", "cancelled", "leaved", "joined", "missed"] },
-          "occurredAt": { "type": "string", "format": "date-time" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "actorUserId": { "type": "string", "nullable": true },
+          "occurred_at": { "type": "string", "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "actor_user_id": { "type": "string", "nullable": true },
           "metadata": { "type": "object" }
         },
-        "required": ["id", "userId", "activityId", "type", "occurredAt", "createdAt"]
+        "required": ["id", "user_id", "activity_id", "type", "occurred_at", "created_at"]
       },
       "UserActivityFeedResponse": {
         "type": "object",
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/UserActivityFeedEvent" } },
-          "nextCursor": { "type": "string", "nullable": true },
-          "hasMore": { "type": "boolean" }
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" }
         },
-        "required": ["items", "hasMore"]
+        "required": ["items", "has_more"]
       }
     }
   },
@@ -596,7 +596,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "refreshToken": { "type": "string" }
+                  "refresh_token": { "type": "string" }
                 }
               }
             }
@@ -619,9 +619,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "refreshToken": { "type": "string" }
+                  "refresh_token": { "type": "string" }
                 },
-                "required": ["refreshToken"]
+                "required": ["refresh_token"]
               }
             }
           }
@@ -915,17 +915,17 @@
         "tags": ["activities"],
         "summary": "List activities",
         "parameters": [
-          { "name": "categoryId", "in": "query", "schema": { "type": "string" } },
-          { "name": "subcategoryId", "in": "query", "schema": { "type": "string" } },
+          { "name": "category_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "subcategory_id", "in": "query", "schema": { "type": "string" } },
           { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["online", "offline"] } },
           { "name": "city", "in": "query", "schema": { "type": "string" } },
-          { "name": "dateFrom", "in": "query", "schema": { "type": "string", "format": "date" } },
-          { "name": "dateTo", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "date_from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "date_to", "in": "query", "schema": { "type": "string", "format": "date" } },
           { "name": "level", "in": "query", "schema": { "type": "string" } },
           { "name": "gender", "in": "query", "schema": { "type": "string" } },
-          { "name": "ageFrom", "in": "query", "schema": { "type": "integer" } },
-          { "name": "ageTo", "in": "query", "schema": { "type": "integer" } },
-          { "name": "requiresApproval", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "age_from", "in": "query", "schema": { "type": "integer" } },
+          { "name": "age_to", "in": "query", "schema": { "type": "integer" } },
+          { "name": "requires_approval", "in": "query", "schema": { "type": "boolean" } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
           { "name": "cursor", "in": "query", "schema": { "type": "string" } }
         ],
@@ -1301,7 +1301,7 @@
         "tags": ["notifications"],
         "summary": "List current user notifications",
         "parameters": [
-          { "name": "unreadOnly", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "unread_only", "in": "query", "schema": { "type": "boolean" } },
           { "name": "type", "in": "query", "schema": { "type": "string" } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
           { "name": "cursor", "in": "query", "schema": { "type": "string" } }
@@ -1417,8 +1417,8 @@
         "tags": ["subscriptions"],
         "summary": "List current user subscriptions",
         "parameters": [
-          { "name": "pinnedOnly", "in": "query", "schema": { "type": "boolean" } },
-          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["subscribedAt", "name"] } },
+          { "name": "pinned_only", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["subscribed_at", "name"] } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
           { "name": "cursor", "in": "query", "schema": { "type": "string" } }
         ],

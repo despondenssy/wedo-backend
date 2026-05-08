@@ -16,12 +16,12 @@ def test_activity_list_filters_pagination_and_requires_auth(api_client, auth_cli
     unauth = APIClient().get('/activities')
     assert unauth.status_code == status.HTTP_401_UNAUTHORIZED
 
-    response = auth_client.get('/activities?categoryId=sport&citySettlement=Moscow&limit=1')
+    response = auth_client.get('/activities?category_id=sport&city_settlement=Moscow&limit=1')
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body['items'][0]['id'] == str(football.id)
-    assert body['hasMore'] is False
-    assert body['nextCursor'] is None
+    assert body['has_more'] is False
+    assert body['next_cursor'] is None
 
 
 def test_activity_detail_patch_delete_cancel_and_permissions(
@@ -35,7 +35,7 @@ def test_activity_detail_patch_delete_cancel_and_permissions(
 
     detail = auth_client.get(f'/activities/{activity.id}')
     assert detail.status_code == status.HTTP_200_OK
-    assert detail.json()['policyFlags']['canEdit'] is True
+    assert detail.json()['policy_flags']['can_edit'] is True
 
     patched = auth_client.patch(f'/activities/{activity.id}', {'title': 'Renamed'}, format='json')
     activity.refresh_from_db()
@@ -104,9 +104,9 @@ def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
 
     assert created.status_code == status.HTTP_201_CREATED
     body = created.json()
-    assert body['categoryId'] == 'sport'
-    assert body['preferences']['ageFrom'] == 18
-    assert body['preferences']['maxParticipants'] == 5
+    assert body['category_id'] == 'sport'
+    assert body['preferences']['age_from'] == 18
+    assert body['preferences']['max_participants'] == 5
     assert UserActivityFeedEvent.objects.filter(
         user=user,
         activity_id=body['id'],

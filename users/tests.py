@@ -17,7 +17,7 @@ def register_payload(email='new@example.com'):
         'name': 'New User',
         'email': email,
         'password': 'StrongPass123',
-        'birthDate': '1998-05-20',
+        'birth_date': '1998-05-20',
         'gender': 'female',
         'city': {
             'settlement': 'Moscow',
@@ -28,7 +28,7 @@ def register_payload(email='new@example.com'):
             'title': 'Moscow',
         },
         'interests': ['sport'],
-        'showBirthDate': True,
+        'show_birth_date': True,
     }
 
 
@@ -37,8 +37,8 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
 
     assert response.status_code == status.HTTP_201_CREATED
     body = response.json()
-    assert body['user']['showBirthDate'] is True
-    assert body['tokens']['accessToken']
+    assert body['user']['show_birth_date'] is True
+    assert body['tokens']['access_token']
     assert User.objects.filter(email='new@example.com').exists()
     user = User.objects.get(email='new@example.com')
     assert user.show_birth_date is True
@@ -50,20 +50,20 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
     )
     assert login.status_code == status.HTTP_200_OK
     login_body = login.json()
-    assert login_body['tokens']['refreshToken']
+    assert login_body['tokens']['refresh_token']
 
     refresh = api_client.post(
         '/auth/refresh',
-        {'refreshToken': login_body['tokens']['refreshToken']},
+        {'refresh_token': login_body['tokens']['refresh_token']},
         format='json',
     )
     assert refresh.status_code == status.HTTP_200_OK
-    assert refresh.json()['accessToken']
+    assert refresh.json()['access_token']
 
     api_client.force_authenticate(user=user)
     logout = api_client.post(
         '/auth/logout',
-        {'refreshToken': login_body['tokens']['refreshToken']},
+        {'refresh_token': login_body['tokens']['refresh_token']},
         format='json',
     )
     assert logout.status_code == status.HTTP_204_NO_CONTENT
@@ -71,12 +71,12 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
 
 def test_register_requires_show_birth_date(api_client):
     payload = register_payload()
-    payload.pop('showBirthDate')
+    payload.pop('show_birth_date')
 
     response = api_client.post('/auth/register', payload, format='json')
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert 'showBirthDate' in response.json()
+    assert 'show_birth_date' in response.json()
 
 
 def test_register_rejects_short_password(api_client):
@@ -120,14 +120,14 @@ def test_login_and_refresh_reject_invalid_data(api_client, user):
     no_refresh = api_client.post('/auth/refresh', {}, format='json')
     assert no_refresh.status_code == status.HTTP_400_BAD_REQUEST
 
-    bad_refresh = api_client.post('/auth/refresh', {'refreshToken': 'bad'}, format='json')
+    bad_refresh = api_client.post('/auth/refresh', {'refresh_token': 'bad'}, format='json')
     assert bad_refresh.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     get_response = auth_client.get('/me')
     assert get_response.status_code == status.HTTP_200_OK
-    assert get_response.json()['isCurrentUser'] is True
+    assert get_response.json()['is_current_user'] is True
 
     patch_response = auth_client.patch(
         '/me',
@@ -142,7 +142,7 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
                 'title': 'SPb',
             },
             'interests': ['music'],
-            'showBirthDate': True,
+            'show_birth_date': True,
         },
         format='json',
     )
@@ -151,7 +151,7 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     assert user.name == 'Updated'
     assert user.city_settlement == 'Saint Petersburg'
     assert user.show_birth_date is True
-    assert patch_response.json()['showBirthDate'] is True
+    assert patch_response.json()['show_birth_date'] is True
 
     delete_response = auth_client.delete('/me')
     user.refresh_from_db()
@@ -206,7 +206,7 @@ def test_qr_token_resolve_and_scan(
     created = auth_client.post('/me/qr-token', {}, format='json')
     assert created.status_code == status.HTTP_200_OK
     created_body = created.json()
-    assert 'expiresAt' in created_body
+    assert 'expires_at' in created_body
     assert QrToken.objects.filter(user=user).count() == 1
 
     resolver = api_client

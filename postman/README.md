@@ -1,4 +1,4 @@
-# WeDo Postman Collection
+﻿# WeDo Postman Collection
 
 В папке лежат файлы для ручного тестирования API через Postman:
 
@@ -41,22 +41,22 @@ Invoke-WebRequest http://127.0.0.1:8000/api/openapi.json -UseBasicParsing
 Основные переменные:
 
 - `baseUrl` — адрес backend, по умолчанию `http://127.0.0.1:8000`.
-- `accessToken` — JWT access token.
-- `refreshToken` — JWT refresh token.
-- `userId` — текущий пользователь.
-- `otherUserId` — второй пользователь.
-- `targetUserId` — пользователь для запросов подписок и профиля.
-- `activityId` — активность для связанных запросов.
-- `fileId` — загруженный файл.
-- `notificationId` — уведомление.
-- `qrToken` — QR-токен пользователя.
+- `access_token` — JWT access token.
+- `refresh_token` — JWT refresh token.
+- `user_id` — текущий пользователь.
+- `other_user_id` — второй пользователь.
+- `target_user_id` — пользователь для запросов подписок и профиля.
+- `activity_id` — активность для связанных запросов.
+- `file_id` — загруженный файл.
+- `notification_id` — уведомление.
+- `qr_token` — QR-токен пользователя.
 
 Важно: переменная называется именно `baseUrl`. Postman учитывает регистр, поэтому `{{baseurl}}` не подставится.
 
 ## Базовый порядок проверки
 
 1. Выполнить `Auth / Register Current User`.
-   После ответа автоматически сохранятся `accessToken`, `refreshToken`, `userId`.
+   После ответа автоматически сохранятся `access_token`, `refresh_token`, `user_id`.
 
 2. Если пользователь уже создан, выполнить `Auth / Login`.
    Этот запрос также сохраняет токены.
@@ -65,7 +65,7 @@ Invoke-WebRequest http://127.0.0.1:8000/api/openapi.json -UseBasicParsing
 
 4. Выполнить `Activities / List Activities`.
 
-5. Если в базе уже есть активности, вручную указать `activityId` в окружении или взять ID из ответа списка активностей.
+5. Если в базе уже есть активности, вручную указать `activity_id` в окружении или взять ID из ответа списка активностей.
 
 6. Выполнить связанные запросы:
 
@@ -78,7 +78,7 @@ Ratings / List Activity Ratings
 ```
 
 7. Для проверки второго пользователя выполнить `Auth / Register Other User`.
-   Этот запрос сохраняет `otherUserId` и `targetUserId`.
+   Этот запрос сохраняет `other_user_id` и `target_user_id`.
 
 После регистрации второго пользователя активным станет токен второго пользователя. Чтобы снова работать от имени первого пользователя, нужно выполнить `Auth / Login`.
 
@@ -89,7 +89,7 @@ Ratings / List Activity Ratings
 1. Открыть `Files / Upload Image`.
 2. В `Body -> form-data` выбрать файл в поле `file`.
 3. Отправить запрос.
-4. После успешного ответа сохранится `fileId`.
+4. После успешного ответа сохранится `file_id`.
 5. Выполнить `Files / List Files By IDs` или `Files / Download File`.
 
 ## Документация

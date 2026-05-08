@@ -18,9 +18,9 @@ def test_subscription_list_and_delete(
     Subscription.objects.create(follower=user, target=target)
     Subscription.objects.create(follower=user, target=second, is_pinned=True)
 
-    me_list = auth_client.get('/me/subscriptions?pinnedOnly=true')
+    me_list = auth_client.get('/me/subscriptions?pinned_only=true')
     assert me_list.status_code == status.HTTP_200_OK
-    assert [item['userId'] for item in me_list.json()['items']] == [str(second.id)]
+    assert [item['user_id'] for item in me_list.json()['items']] == [str(second.id)]
 
     sorted_list = auth_client.get('/subscriptions?sort=name')
     assert sorted_list.status_code == status.HTTP_200_OK
@@ -28,30 +28,30 @@ def test_subscription_list_and_delete(
 
     deleted = auth_client.delete(f'/subscriptions/{target.id}')
     assert deleted.status_code == status.HTTP_200_OK
-    assert deleted.json() == {'userId': str(target.id), 'deleted': True}
+    assert deleted.json() == {'user_id': str(target.id), 'deleted': True}
     assert not Subscription.objects.filter(follower=user, target=target).exists()
 
 
 def test_subscription_detail_404_for_nonexistent_or_not_owned(auth_client, other_user):
     delete_response = auth_client.delete(f'/subscriptions/{other_user.id}')
-    patch_response = auth_client.patch(f'/subscriptions/{other_user.id}', {'isPinned': True}, format='json')
+    patch_response = auth_client.patch(f'/subscriptions/{other_user.id}', {'is_pinned': True}, format='json')
 
     assert delete_response.status_code == status.HTTP_404_NOT_FOUND
     assert patch_response.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_subscription_create_and_patch_accept_camel_case(auth_client, user_factory):
+def test_subscription_create(auth_client, user_factory):
     target = user_factory()
 
-    created = auth_client.post('/subscriptions', {'userId': target.id}, format='json')
+    created = auth_client.post('/subscriptions', {'user_id': target.id}, format='json')
     assert created.status_code == status.HTTP_201_CREATED
-    assert created.json()['userId'] == str(target.id)
+    assert created.json()['user_id'] == str(target.id)
 
-    patched = auth_client.patch(f'/subscriptions/{target.id}', {'isPinned': True}, format='json')
+    patched = auth_client.patch(f'/subscriptions/{target.id}', {'is_pinned': True}, format='json')
     subscription = Subscription.objects.get(target=target)
 
     assert patched.status_code == status.HTTP_200_OK
-    assert patched.json()['isPinned'] is True
+    assert patched.json()['is_pinned'] is True
     assert subscription.is_pinned is True
 
 

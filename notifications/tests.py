@@ -19,7 +19,7 @@ def test_notifications_list_filters_mark_read_unread_read_all_and_delete(
     read = notification_factory(user, type=Notification.Type.REQUEST, title='Read', read_at=timezone.now())
     notification_factory(other_user, type=Notification.Type.SYSTEM)
 
-    list_response = auth_client.get('/me/notifications?unreadOnly=true&type=system')
+    list_response = auth_client.get('/me/notifications?unread_only=true&type=system')
     assert list_response.status_code == status.HTTP_200_OK
     assert [item['id'] for item in list_response.json()['items']] == [str(unread.id)]
 
