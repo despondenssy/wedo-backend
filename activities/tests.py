@@ -27,6 +27,34 @@ def test_activity_list_filters_pagination_and_requires_auth(api_client, auth_cli
     assert body['next_cursor'] is None
 
 
+def test_activity_list_text_search_by_title_and_category(auth_client, activity_factory):
+    """
+    Параметр q ищет вхождение подстроки (без учёта регистра) в названии,
+    описании, category_id и subcategory_id. Используется на главном экране
+    при вводе поискового запроса.
+    """
+    yoga = activity_factory(title='Утренняя йога в парке', category_id='sport', subcategory_id='yoga')
+    guitar = activity_factory(title='Игра на гитаре', category_id='music', subcategory_id='guitar')
+    activity_factory(title='Шахматный турнир', category_id='games', subcategory_id='chess')
+
+    # поиск по части названия — без учёта регистра
+    by_title = auth_client.get('/activities?q=ЙОГ')
+    ids = [item['id'] for item in by_title.json()['items']]
+    assert str(yoga.id) in ids
+    assert str(guitar.id) not in ids
+
+    # поиск по category_id
+    by_category = auth_client.get('/activities?q=music')
+    ids = [item['id'] for item in by_category.json()['items']]
+    assert str(guitar.id) in ids
+    assert str(yoga.id) not in ids
+
+    # пустой/пробельный q не фильтрует
+    blank = auth_client.get('/activities?q=  ')
+    assert blank.status_code == status.HTTP_200_OK
+    assert len(blank.json()['items']) >= 3
+
+
 def test_activity_detail_patch_delete_cancel_and_permissions(
     api_client,
     auth_client,

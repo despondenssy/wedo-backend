@@ -125,6 +125,102 @@ def _encode_cursor(obj, sort_field):
     return f'{value}:{obj.id}'
 
 
+def transfer_organizership_or_cancel(activity):
+    """
+    Передаёт организаторство активности следующему участнику в порядке записи.
+    Если участников нет — отменяет активность и уведомляет оставшихся.
+
+    Используется в двух сценариях:
+    - текущий организатор удалил аккаунт (`MeView.delete`)
+    - текущий организатор сам отказался от роли (`ActivityDeclineOrganizershipView`)
+    """
+    from participation.models import Participation
+    from notifications.tasks import _create_notification_and_push
+    from notifications.models import Notification
+
+    # следующий кандидат — по дате присоединения, accepted-участник
+    next_p = (
+        Participation.objects
+        .filter(activity=activity, status=Participation.Status.ACCEPTED)
+        .select_related('user')
+        .order_by('created_at')
+        .first()
+    )
+
+    if next_p:
+        new_organizer = next_p.user
+        # участник становится организатором — убираем его из участия
+        next_p.delete()
+        activity.organizer = new_organizer
+        activity.save(update_fields=['organizer'])
+
+        _create_notification_and_push(
+            user=new_organizer,
+            type=Notification.Type.SYSTEM,
+            title='Вы стали организатором',
+            message=(
+                f'Бывший организатор активности «{activity.title}» покинул её. '
+                f'Теперь вы организатор. Если не готовы — нажмите «отказаться».'
+            ),
+            activity=activity,
+        )
+        return 'transferred'
+
+    # участников нет — отменяем
+    activity.status = Activity.Status.CANCELLED
+    activity.cancelled_at = timezone.now()
+    activity.save(update_fields=['status', 'cancelled_at'])
+    # уведомляем всех кто числился на этой активности — включая pending-заявки,
+    # чтобы они не висели на отменённой активности без обратной связи
+    remaining = (
+        Participation.objects
+        .filter(
+            activity=activity,
+            status__in=[
+                Participation.Status.ACCEPTED,
+                Participation.Status.ATTENDED,
+                Participation.Status.PENDING,
+            ],
+        )
+        .select_related('user')
+    )
+    for p in remaining:
+        _create_notification_and_push(
+            user=p.user,
+            type=Notification.Type.SYSTEM,
+            title='Активность отменена',
+            message=f'«{activity.title}» отменена — не нашлось нового организатора.',
+            activity=activity,
+        )
+    return 'cancelled'
+
+
+class ActivityDeclineOrganizershipView(APIView):
+    """POST /activities/:id/decline-organizership — отказаться от роли организатора.
+
+    Передаёт активность следующему по очереди участнику, либо отменяет
+    если участников больше нет. Текущий организатор после отказа выбывает.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, activity_id):
+        activity = get_object_or_404(Activity, id=activity_id)
+
+        if activity.organizer_id != request.user.id:
+            return Response(
+                {'error': {'code': 'FORBIDDEN', 'message': 'Отказаться может только текущий организатор'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if activity.status != Activity.Status.ACTIVE:
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже отменена или завершена'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        transfer_organizership_or_cancel(activity)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ActivityListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -132,6 +228,7 @@ class ActivityListView(APIView):
         queryset = Activity.objects.filter(status=Activity.Status.ACTIVE)
 
         # фильтрация
+        q = request.query_params.get('q')
         category_id = request.query_params.get('category_id')
         subcategory_id = request.query_params.get('subcategory_id')
         format_ = request.query_params.get('format')
@@ -150,6 +247,17 @@ class ActivityListView(APIView):
         max_participants = request.query_params.get('max_participants')
         timezone_offset_from = request.query_params.get('time_zone_offset_from')
         timezone_offset_to = request.query_params.get('time_zone_offset_to')
+
+        # текстовый поиск — ищем в названии, описании и категориях
+        if q:
+            q_trimmed = q.strip()
+            if q_trimmed:
+                queryset = queryset.filter(
+                    Q(title__icontains=q_trimmed) |
+                    Q(description__icontains=q_trimmed) |
+                    Q(category_id__icontains=q_trimmed) |
+                    Q(subcategory_id__icontains=q_trimmed)
+                )
 
         if category_id:
             queryset = queryset.filter(category_id=category_id)

@@ -199,10 +199,16 @@ class UserSnippetSerializer(serializers.ModelSerializer):
     """Компактный профиль для вложений — карточки активностей, списки участников."""
     id = serializers.CharField()
     avatar_file_id = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'avatar_file_id', 'rating']
+        fields = ['id', 'name', 'avatar_file_id', 'rating', 'is_deleted']
 
     def get_avatar_file_id(self, obj):
         return str(obj.avatar_file_id) if obj.avatar_file_id else None
+
+    def get_is_deleted(self, obj):
+        # фронт по этому полю узнаёт что профиль не открыть, и может
+        # отрисовать имя серым / отключить переход на страницу пользователя
+        return obj.deleted_at is not None

@@ -98,10 +98,43 @@ class MeView(APIView):
         return Response(UserProfileSerializer(user, context={'request': request}).data)
 
     def delete(self, request):
+        from activities.models import Activity
+        from activities.views import transfer_organizership_or_cancel
+
         user = request.user
-        user.deleted_at = timezone.now()
+        now = timezone.now()
+
+        # 1) для каждой будущей активной активности передаём организаторство
+        #    следующему участнику. Если участников нет — активность отменяется,
+        #    и оставшимся уходит уведомление. Подробности — в хелпере.
+        future_activities = list(
+            Activity.objects.filter(
+                organizer=user,
+                status=Activity.Status.ACTIVE,
+                start_at__gte=now,
+            )
+        )
+        for activity in future_activities:
+            transfer_organizership_or_cancel(activity)
+
+        # 2) анонимизируем персональные данные юзера. Прошлые активности и
+        #    оставленные участия не трогаем — у других пользователей сохраняется
+        #    история «с кем посещал», а имя удалённого отображается как
+        #    «Удалённый пользователь» через UserSnippetSerializer.is_deleted.
+        user.deleted_at = now
         user.is_active = False
+        user.name = 'Удалённый пользователь'
+        user.email = f'deleted-{user.id}@deleted.local'
+        user.avatar_file = None
+        user.city_settlement = None
+        user.city_region = None
+        user.city_country = None
+        user.city_latitude = None
+        user.city_longitude = None
+        user.city_title = None
+        user.interests = []
         user.save()
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -126,6 +159,16 @@ class UserHistoryView(APIView):
         if tab == 'created':
             queryset = Activity.objects.filter(
                 organizer=user
+            ).select_related('organizer')
+
+        elif tab == 'future_created':
+            # активности, которые пользователь организует и которые ещё актуальны
+            # (используется на экране QR-сканирования организатора —
+            # ему не нужны прошедшие или отменённые)
+            queryset = Activity.objects.filter(
+                organizer=user,
+                status=Activity.Status.ACTIVE,
+                start_at__gte=timezone.now(),
             ).select_related('organizer')
 
         elif tab == 'upcoming':
@@ -154,7 +197,7 @@ class UserHistoryView(APIView):
 
         else:
             return Response(
-                {'error': {'code': 'INVALID_TAB', 'message': 'Допустимые значения: created, upcoming, attended'}},
+                {'error': {'code': 'INVALID_TAB', 'message': 'Допустимые значения: created, future_created, upcoming, attended'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

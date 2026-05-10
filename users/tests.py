@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from activities.models import Activity
 from participation.models import Participation
 from users.models import QrToken, User
 
@@ -158,6 +159,12 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     assert delete_response.status_code == status.HTTP_204_NO_CONTENT
     assert user.is_active is False
     assert user.deleted_at is not None
+    # персональные данные анонимизированы — реальное имя и email
+    # не остаются в системе после удаления аккаунта
+    assert user.name == 'Удалённый пользователь'
+    assert user.email == f'deleted-{user.id}@deleted.local'
+    assert user.city_settlement is None
+    assert user.interests == []
 
 
 
@@ -192,6 +199,280 @@ def test_user_history_my_activities_rating_and_attendance(
 
     invalid_tab = auth_client.get(f'/users/{user.id}/history?tab=bad')
     assert invalid_tab.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_user_history_future_created_tab(
+    auth_client,
+    user,
+    activity_factory,
+):
+    """
+    Таб future_created — для экрана QR-сканирования организатора.
+    Возвращает только активные и ещё не начавшиеся активности юзера.
+    Прошедшие, отменённые и активности других — не должны попадать.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+
+    now = timezone.now()
+    future_active = activity_factory(
+        organizer=user,
+        start_at=now + timedelta(days=1),
+        end_at=now + timedelta(days=1, hours=2),
+    )
+    past = activity_factory(
+        organizer=user,
+        start_at=now - timedelta(days=2),
+        end_at=now - timedelta(days=2, hours=-2),
+    )
+    cancelled = activity_factory(
+        organizer=user,
+        start_at=now + timedelta(days=3),
+        end_at=now + timedelta(days=3, hours=2),
+        status=Activity.Status.CANCELLED,
+    )
+    other_user_activity = activity_factory()  # организует не наш пользователь
+
+    response = auth_client.get(f'/users/{user.id}/history?tab=future_created')
+    assert response.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in response.json()['items']]
+
+    assert str(future_active.id) in ids
+    assert str(past.id) not in ids
+    assert str(cancelled.id) not in ids
+    assert str(other_user_activity.id) not in ids
+
+
+def test_organizer_deletion_transfers_activity_to_first_participant(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    participation_factory,
+):
+    """
+    При удалении организатора активность не отменяется, если есть участники —
+    она передаётся первому по дате присоединения. Новый организатор получает
+    уведомление, его участие удаляется (он теперь организатор, не участник).
+    Прошлые активности не трогаются.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from notifications.models import Notification
+
+    now = timezone.now()
+    future = activity_factory(
+        organizer=user,
+        start_at=now + timedelta(days=1),
+        end_at=now + timedelta(days=1, hours=2),
+    )
+    past = activity_factory(
+        organizer=user,
+        start_at=now - timedelta(days=5),
+        end_at=now - timedelta(days=5, hours=-2),
+    )
+
+    # порядок присоединения важен: first_participant получит организаторство
+    first_participant = user_factory()
+    later_participant = user_factory()
+    p1 = participation_factory(future, first_participant, status=Participation.Status.ACCEPTED)
+    p2 = participation_factory(future, later_participant, status=Participation.Status.ACCEPTED)
+    # вручную раздвинем created_at чтобы порядок был детерминированный
+    p1.created_at = now - timedelta(hours=2)
+    p1.save(update_fields=['created_at'])
+    p2.created_at = now - timedelta(hours=1)
+    p2.save(update_fields=['created_at'])
+
+    delete_response = auth_client.delete('/me')
+    assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+    future.refresh_from_db()
+    past.refresh_from_db()
+
+    # активность не отменена, у неё новый организатор
+    assert future.status == Activity.Status.ACTIVE
+    assert future.organizer_id == first_participant.id
+
+    # участие нового организатора удалено
+    assert not Participation.objects.filter(activity=future, user=first_participant).exists()
+
+    # уведомление пришло именно ему
+    assert Notification.objects.filter(
+        user=first_participant,
+        type=Notification.Type.SYSTEM,
+        activity=future,
+    ).exists()
+
+    # второй участник остался участником
+    assert Participation.objects.filter(
+        activity=future, user=later_participant, status=Participation.Status.ACCEPTED,
+    ).exists()
+
+    # прошлая активность не тронута
+    assert past.status == Activity.Status.ACTIVE
+
+
+def test_organizer_deletion_cancels_activity_when_no_participants(
+    auth_client,
+    user,
+    activity_factory,
+):
+    """
+    Если у активности нет участников, передавать некому — активность отменяется.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+
+    now = timezone.now()
+    lonely = activity_factory(
+        organizer=user,
+        start_at=now + timedelta(days=1),
+        end_at=now + timedelta(days=1, hours=2),
+    )
+
+    delete_response = auth_client.delete('/me')
+    assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+    lonely.refresh_from_db()
+    assert lonely.status == Activity.Status.CANCELLED
+
+
+def test_organizer_deletion_notifies_pending_requests_on_cancel(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    participation_factory,
+):
+    """
+    При отмене активности (передавать некому) pending-заявкам тоже
+    приходит уведомление, чтобы они знали что заявка уже не будет рассмотрена.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from notifications.models import Notification
+
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+        requires_approval=True,
+    )
+    pending_user = user_factory()
+    participation_factory(activity, pending_user, status=Participation.Status.PENDING)
+
+    delete_response = auth_client.delete('/me')
+    assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+    activity.refresh_from_db()
+    assert activity.status == Activity.Status.CANCELLED
+    assert Notification.objects.filter(
+        user=pending_user,
+        type=Notification.Type.SYSTEM,
+        activity=activity,
+    ).exists()
+
+
+def test_decline_organizership_passes_activity_to_next_participant(
+    auth_client,
+    user,
+    user_factory,
+    activity_factory,
+    participation_factory,
+):
+    """
+    Текущий организатор может отказаться через POST /decline-organizership.
+    Активность переходит к следующему участнику по дате присоединения.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+
+    now = timezone.now()
+    activity = activity_factory(
+        organizer=user,
+        start_at=now + timedelta(days=1),
+        end_at=now + timedelta(days=1, hours=2),
+    )
+    next_in_line = user_factory()
+    participation_factory(activity, next_in_line, status=Participation.Status.ACCEPTED)
+
+    response = auth_client.post(
+        f'/activities/{activity.id}/decline-organizership', {}, format='json',
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    activity.refresh_from_db()
+    assert activity.status == Activity.Status.ACTIVE
+    assert activity.organizer_id == next_in_line.id
+
+
+def test_decline_organizership_cancels_when_no_one_left(
+    auth_client,
+    user,
+    activity_factory,
+):
+    """Если отказывается единственный организатор и участников нет — отмена."""
+    from datetime import timedelta
+    from django.utils import timezone
+
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+
+    response = auth_client.post(
+        f'/activities/{activity.id}/decline-organizership', {}, format='json',
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    activity.refresh_from_db()
+    assert activity.status == Activity.Status.CANCELLED
+
+
+def test_decline_organizership_forbidden_for_non_organizer(
+    api_client,
+    user,
+    other_user,
+    activity_factory,
+):
+    """Отказаться от роли может только текущий организатор."""
+    from datetime import timedelta
+    from django.utils import timezone
+
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    api_client.force_authenticate(user=other_user)
+
+    response = api_client.post(
+        f'/activities/{activity.id}/decline-organizership', {}, format='json',
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_user_snippet_includes_is_deleted_flag(api_client, user, activity_factory):
+    """
+    На карточке активности организатор отдаётся через UserSnippetSerializer
+    с полем is_deleted — фронт по нему отрисовывает удалённого организатора серым.
+    """
+    from django.utils import timezone
+
+    activity = activity_factory(organizer=user)
+
+    api_client.force_authenticate(user=user)
+    detail = api_client.get(f'/activities/{activity.id}')
+    assert detail.status_code == status.HTTP_200_OK
+    assert detail.json()['organizer']['is_deleted'] is False
+
+    # помечаем юзера как удалённого
+    user.deleted_at = timezone.now()
+    user.save(update_fields=['deleted_at'])
+
+    detail_after = api_client.get(f'/activities/{activity.id}')
+    assert detail_after.json()['organizer']['is_deleted'] is True
 
 
 def test_qr_token_resolve_and_scan(
