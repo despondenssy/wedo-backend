@@ -1,4 +1,7 @@
+from datetime import timedelta, datetime
+
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 
@@ -199,6 +202,197 @@ def test_saved_activities_crud(auth_client, user, activity_factory):
     assert not SavedActivity.objects.filter(user=user, activity=activity).exists()
 
 
+def test_activity_list_sort_and_order(auth_client, activity_factory):
+    """sort и order меняют порядок выдачи."""
+    a1 = activity_factory(price=100, start_at=timezone.now() + timedelta(days=10))
+    a2 = activity_factory(price=50, start_at=timezone.now() + timedelta(days=5))
+    a3 = activity_factory(price=200, start_at=timezone.now() + timedelta(days=1))
+
+    # sort=price, order=asc
+    resp = auth_client.get('/activities?sort=price&order=asc')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert ids == [str(a2.id), str(a1.id), str(a3.id)]
+
+    # sort=price, order=desc
+    resp = auth_client.get('/activities?sort=price&order=desc')
+    ids = [item['id'] for item in resp.json()['items']]
+    assert ids == [str(a3.id), str(a1.id), str(a2.id)]
+
+    # sort=start_at, order=asc
+    resp = auth_client.get('/activities?sort=start_at&order=asc')
+    ids = [item['id'] for item in resp.json()['items']]
+    assert ids == [str(a3.id), str(a2.id), str(a1.id)]
+
+
+def test_activity_list_time_filters(auth_client, activity_factory):
+    """time_from / time_to фильтруют по времени старта."""
+    # активности в разное время
+    morning = activity_factory(start_at=timezone.now().replace(hour=9, minute=0))
+    afternoon = activity_factory(start_at=timezone.now().replace(hour=14, minute=0))
+    evening = activity_factory(start_at=timezone.now().replace(hour=20, minute=0))
+
+    # time_from=10:00 — должны получить afternoon и evening
+    resp = auth_client.get('/activities?time_from=10:00')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(morning.id) not in ids
+    assert str(afternoon.id) in ids
+    assert str(evening.id) in ids
+
+    # time_to=18:00 — должны получить morning и afternoon
+    resp = auth_client.get('/activities?time_to=18:00')
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(morning.id) in ids
+    assert str(afternoon.id) in ids
+    assert str(evening.id) not in ids
+
+    # time_from=10:00&time_to=18:00 — только afternoon
+    resp = auth_client.get('/activities?time_from=10:00&time_to=18:00')
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(morning.id) not in ids
+    assert str(afternoon.id) in ids
+    assert str(evening.id) not in ids
+
+
+def test_activity_list_only_available(auth_client, activity_factory, participation_factory, user):
+    """only_available=true исключает заполненные активности."""
+    # активность без лимита — всегда доступна
+    no_limit = activity_factory(pref_max_participants=None)
+
+    # активность с лимитом 2, 1 участник — доступна
+    has_spots = activity_factory(pref_max_participants=2)
+    participation_factory(has_spots, user, status='accepted')
+
+    # активность с лимитом 1, 1 участник — заполнена
+    full = activity_factory(pref_max_participants=1)
+    participation_factory(full, user, status='accepted')
+
+    resp = auth_client.get('/activities?only_available=true')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(no_limit.id) in ids
+    assert str(has_spots.id) in ids
+    assert str(full.id) not in ids
+
+
+def test_activity_list_max_participants(auth_client, activity_factory):
+    """max_participants фильтрует по pref_max_participants."""
+    small = activity_factory(pref_max_participants=5)
+    medium = activity_factory(pref_max_participants=10)
+    large = activity_factory(pref_max_participants=20)
+
+    resp = auth_client.get('/activities?max_participants=10')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(small.id) in ids
+    assert str(medium.id) in ids
+    assert str(large.id) not in ids
+
+
+def test_activity_list_timezone_offset_filter(auth_client, activity_factory):
+    """time_zone_offset_from/to фильтрует online-активности по часовому поясу."""
+    # online-активности в разных таймзонах
+    moscow = activity_factory(
+        format='online',
+        time_zone='Europe/Moscow',
+        start_at=timezone.now(),
+    )
+    london = activity_factory(
+        format='online',
+        time_zone='Europe/London',
+        start_at=timezone.now(),
+    )
+    ny = activity_factory(
+        format='online',
+        time_zone='America/New_York',
+        start_at=timezone.now(),
+    )
+
+    # offline-активность не должна фильтроваться по timezone
+    offline = activity_factory(format='offline', time_zone='Europe/Moscow')
+
+    # Фильтр применяется только при format=online в query-параметрах
+    # time_zone_offset_from=2 — Moscow (UTC+3) подходит, London (UTC+1) и NY (UTC-4) — нет
+    resp = auth_client.get('/activities?format=online&time_zone_offset_from=2')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(moscow.id) in ids
+    assert str(london.id) not in ids  # London = UTC+1, 1 < 2
+    assert str(ny.id) not in ids  # NY = UTC-4, -4 < 2
+    assert str(offline.id) not in ids  # offline не online
+
+
+def test_activity_list_cursor_pagination_with_sort(auth_client, activity_factory):
+    """cursor-пагинация работает с нестандартной сортировкой."""
+    a1 = activity_factory(price=100)
+    a2 = activity_factory(price=50)
+    a3 = activity_factory(price=200)
+
+    # sort=price, order=asc, limit=1
+    resp = auth_client.get('/activities?sort=price&order=asc&limit=1')
+    assert resp.status_code == status.HTTP_200_OK
+    body = resp.json()
+    assert len(body['items']) == 1
+    assert body['items'][0]['id'] == str(a2.id)  # price=50
+    assert body['has_more'] is True
+    assert body['next_cursor'] is not None
+    assert ':' in body['next_cursor']  # составной курсор
+
+    # следующая страница
+    resp2 = auth_client.get(f'/activities?sort=price&order=asc&limit=1&cursor={body["next_cursor"]}')
+    assert resp2.status_code == status.HTTP_200_OK
+    body2 = resp2.json()
+    assert len(body2['items']) == 1
+    assert body2['items'][0]['id'] == str(a1.id)  # price=100
+
+
+def test_activity_list_timezone_offset_dst_handling(auth_client, activity_factory):
+    """Проверка, что offset считается на дату start_at, а не текущую."""
+    from datetime import timezone as tz_module
+
+    # активность в London зимой (UTC+0)
+    winter = activity_factory(
+        format='online',
+        time_zone='Europe/London',
+        start_at=datetime(2024, 1, 15, 12, 0, tzinfo=tz_module.utc),
+    )
+    # активность в London летом (UTC+1)
+    summer = activity_factory(
+        format='online',
+        time_zone='Europe/London',
+        start_at=datetime(2024, 6, 15, 12, 0, tzinfo=tz_module.utc),
+    )
+
+    # фильтр time_zone_offset_from=1 — должна найтись только летняя
+    resp = auth_client.get('/activities?format=online&time_zone_offset_from=1')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(summer.id) in ids
+    assert str(winter.id) not in ids
+
+
+def test_activity_list_timezone_offset_fractional(auth_client, activity_factory):
+    """Проверка фильтрации по дробным offset'ам (Asia/Kolkata = UTC+5:30)."""
+    kolkata = activity_factory(
+        format='online',
+        time_zone='Asia/Kolkata',
+        start_at=timezone.now(),
+    )
+    moscow = activity_factory(
+        format='online',
+        time_zone='Europe/Moscow',
+        start_at=timezone.now(),
+    )
+
+    # time_zone_offset_from=5&time_zone_offset_to=6 — только Kolkata (5.5)
+    resp = auth_client.get('/activities?format=online&time_zone_offset_from=5&time_zone_offset_to=6')
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(kolkata.id) in ids
+    assert str(moscow.id) not in ids
+
+
 def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
     created = auth_client.post('/activities', activity_payload, format='json')
 
@@ -212,6 +406,20 @@ def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
         activity_id=body['id'],
         type='created',
     ).exists()
+
+
+def test_activity_list_invalid_cursor_returns_400(auth_client, activity_factory):
+    """Невалидный курсор (id — не число) возвращает 400 Bad Request."""
+    activity_factory()
+
+    # простой курсор — не число
+    resp = auth_client.get('/activities?cursor=invalid')
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'Invalid cursor format' in resp.json()['detail']
+
+    # составной курсор — id не число
+    resp = auth_client.get('/activities?cursor=10:xyz')
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_activity_feed_list_filters(

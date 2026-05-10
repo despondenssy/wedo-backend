@@ -1,10 +1,16 @@
+import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+logger = logging.getLogger(__name__)
+
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
 from django.utils import timezone
 
 from .feed_views import create_feed_event
@@ -56,6 +62,69 @@ def _aggregate_participations(activity_ids):
     return real_count, pending_count, total_count, participant_ids
 
 
+# Фиксированные offset'ы для дробных таймзон (в минутах).
+# Эти IANA-зоны выбраны на фронте как представители offset'ов и не имеют DST.
+_FIXED_TZ_OFFSETS_MINUTES = {
+    "Pacific/Marquesas": -570,
+    "America/St_Johns": -210,
+    "Asia/Kabul": 270,
+    "Asia/Kolkata": 330,
+    "Asia/Kathmandu": 345,
+    "Asia/Yangon": 390,
+    "Australia/Eucla": 525,
+    "Australia/Darwin": 570,
+    "Australia/Lord_Howe": 630,
+    "Pacific/Chatham": 765,
+}
+
+
+def get_timezone_offset_hours(dt: datetime, tz_name: str) -> float:
+    """
+    Возвращает UTC-offset в часах для указанной даты и IANA-таймзоны.
+
+    Для дробных таймзон (Pacific/Marquesas и т.д.) использует фиксированную мапу.
+    Для целых (Etc/GMT, Europe/Moscow и т.д.) вычисляет через ZoneInfo
+    с учётом DST на указанную дату.
+    """
+    if tz_name in _FIXED_TZ_OFFSETS_MINUTES:
+        return _FIXED_TZ_OFFSETS_MINUTES[tz_name] / 60
+
+    try:
+        tz = ZoneInfo(tz_name) #делает из IANA объект, который знает offset для каждой конкретной даты
+        local_dt = dt.astimezone(tz) #переводит дату из UTC в локальное время
+        offset = local_dt.utcoffset() #считаем offset на эту дату
+        if offset is None:
+            logger.warning("UTC offset is None for %s at %s", tz_name, dt)
+            return None
+        return offset.total_seconds() / 3600
+    except (ZoneInfoNotFoundError, OSError):
+        logger.warning("Unknown or invalid timezone: %s", tz_name)
+        return None
+
+
+def _decode_cursor(cursor):
+    """Разбирает составной курсор 'value:id' или простой 'id'.
+
+    В случае невалидного курсора (непарсируемый id) возвращает (None, None),
+    чтобы вызывающая сторона могла корректно обработать ошибку.
+    """
+    if not cursor:
+        return None, None
+    try:
+        if ':' in cursor:
+            value, obj_id = cursor.split(':', 1)
+            return value, int(obj_id)
+        return None, int(cursor)
+    except (ValueError, TypeError):
+        return None, None
+
+
+def _encode_cursor(obj, sort_field):
+    """Кодирует составной курсор 'sort_field_value:id'."""
+    value = getattr(obj, sort_field)
+    return f'{value}:{obj.id}'
+
+
 class ActivityListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -69,6 +138,8 @@ class ActivityListView(APIView):
         city = request.query_params.get('city')
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
+        time_from = request.query_params.get('time_from')
+        time_to = request.query_params.get('time_to')
         level = request.query_params.get('level')
         gender = request.query_params.get('gender')
         age_from = request.query_params.get('age_from')
@@ -76,6 +147,9 @@ class ActivityListView(APIView):
         requires_approval = request.query_params.get('requires_approval')
         only_available = request.query_params.get('only_available')
         price_to = request.query_params.get('price_to')
+        max_participants = request.query_params.get('max_participants')
+        timezone_offset_from = request.query_params.get('time_zone_offset_from')
+        timezone_offset_to = request.query_params.get('time_zone_offset_to')
 
         if category_id:
             queryset = queryset.filter(category_id=category_id)
@@ -89,6 +163,14 @@ class ActivityListView(APIView):
         city_region = request.query_params.get('city_region')
         city_country = request.query_params.get('city_country')
 
+        # если фронт не передал город — подставляем город пользователя (как в рекомендациях)
+        if not city_settlement and request.user.city_settlement:
+            city_settlement = request.user.city_settlement
+        if not city_region and request.user.city_region:
+            city_region = request.user.city_region
+        if not city_country and request.user.city_country:
+            city_country = request.user.city_country
+
         if city_settlement:
             queryset = queryset.filter(location_settlement__icontains=city_settlement)
         if city_region:
@@ -100,6 +182,10 @@ class ActivityListView(APIView):
             queryset = queryset.filter(start_at__date__gte=date_from)
         if date_to:
             queryset = queryset.filter(start_at__date__lte=date_to)
+        if time_from:
+            queryset = queryset.filter(start_at__time__gte=time_from)
+        if time_to:
+            queryset = queryset.filter(start_at__time__lte=time_to)
         if level:
             queryset = queryset.filter(pref_level=level)
         if gender:
@@ -112,21 +198,94 @@ class ActivityListView(APIView):
             queryset = queryset.filter(requires_approval=requires_approval == 'true')
         if price_to:
             queryset = queryset.filter(price__lte=price_to)
+        if max_participants:
+            queryset = queryset.filter(pref_max_participants__lte=max_participants)
 
-        # простая cursor pagination по id
+        # only_available: исключаем заполненные активности
+        if only_available == 'true':
+            # один запрос: id + max_participants для всех кандидатов
+            candidates = list(queryset.values('id', 'pref_max_participants'))
+            candidate_ids = [c['id'] for c in candidates]
+            real_count, _, _, _ = _aggregate_participations(candidate_ids)
+            available_ids = [
+                c['id'] for c in candidates
+                if c['pref_max_participants'] is None
+                or real_count.get(c['id'], 0) < c['pref_max_participants']
+            ]
+            queryset = queryset.filter(id__in=available_ids)
+
+        # --- in-memory фильтр по часовому поясу (только для online) ---
+        # Применяется после SQL-фильтров, т.к. offset зависит от start_at и time_zone
+        if format_ == 'online' and (timezone_offset_from is not None or timezone_offset_to is not None):
+            min_offset = float(timezone_offset_from) if timezone_offset_from else float('-inf')
+            max_offset = float(timezone_offset_to) if timezone_offset_to else float('inf')
+
+            # Загружаем id и нужные поля в память для вычисления offset
+            all_filtered = list(queryset.values('id', 'start_at', 'time_zone'))
+            matching_ids = []
+            for item in all_filtered:
+                offset = get_timezone_offset_hours(item['start_at'], item['time_zone'])
+                if offset is None:
+                    continue  # неизвестная таймзона — пропускаем
+                if min_offset <= offset <= max_offset:
+                    matching_ids.append(item['id'])
+
+            queryset = queryset.filter(id__in=matching_ids)
+
+        # --- сортировка ---
+        sort = request.query_params.get('sort', 'created_at')
+        order = request.query_params.get('order', 'desc')
+
+        if order == 'asc':
+            sort_field = sort
+        else:
+            sort_field = f'-{sort}'
+
+        queryset = queryset.order_by(sort_field)
+
+        # --- пагинация ---
         cursor = request.query_params.get('cursor')
         limit = min(int(request.query_params.get('limit', 30)), 50)
 
-        if cursor:
-            queryset = queryset.filter(id__lt=cursor)
+        # Определяем, используется ли стандартная сортировка (-created_at)
+        is_default_sort = (sort == 'created_at' and order == 'desc')
 
+        if cursor:
+            cursor_value, cursor_id = _decode_cursor(cursor)
+            if cursor_value is None and cursor_id is None:
+                return Response(
+                    {'detail': 'Invalid cursor format.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if is_default_sort:
+                queryset = queryset.filter(id__lt=cursor_id)
+            else:
+                if order == 'asc':
+                    queryset = queryset.filter(
+                        Q(**{f'{sort}__gt': cursor_value})
+                        | (Q(**{f'{sort}__exact': cursor_value}) & Q(id__gt=cursor_id))
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(**{f'{sort}__lt': cursor_value})
+                        | (Q(**{f'{sort}__exact': cursor_value}) & Q(id__lt=cursor_id))
+                    )
+
+        # Берём limit + 1 элементов для определения has_more
         queryset = queryset.select_related('organizer')[:limit + 1]
         items = list(queryset)
         has_more = len(items) > limit
         if has_more:
             items = items[:limit]
 
-        next_cursor = str(items[-1].id) if has_more else None
+        if has_more:
+            last = items[-1]
+            if is_default_sort:
+                next_cursor = str(last.id)
+            else:
+                next_cursor = _encode_cursor(last, sort)
+        else:
+            next_cursor = None
 
         # один батчевый запрос вместо N+1 в сериализаторе
         real_count, pending_count, _, _ = _aggregate_participations([a.id for a in items])
