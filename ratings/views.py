@@ -9,7 +9,6 @@ from participation.models import Participation
 from .models import ActivityRating
 from .tasks import recalculate_organizer_rating
 from notifications.tasks import notify_organizer_of_new_rating
-from activities.feed_views import create_feed_event
 from .serializers import ActivityRatingSerializer, CreateActivityRatingSerializer
 
 
@@ -74,8 +73,6 @@ class ActivityRatingsView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         rating = serializer.save(activity=activity, user=request.user)
-
-        create_feed_event(request.user, activity, 'rated')
 
         # пересчёт рейтинга организатора уходит в фон — клиент получает ответ
         # быстро, пересчёт выполняет Celery worker. См. ratings/tasks.py

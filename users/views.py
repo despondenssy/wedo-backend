@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from activities.serializers import ActivityListItemSerializer
 from activities.models import Activity
@@ -156,6 +157,23 @@ class UserHistoryView(APIView):
         limit = min(int(request.query_params.get('limit', 20)), 50)
         cursor = request.query_params.get('cursor')
 
+        from participation.models import Participation
+        from ratings.models import ActivityRating
+        from activities.views import _aggregate_participations
+
+        # «активные» участия для табов participant/all — без rejected и pending
+        _PARTICIPATED_STATUSES = (
+            Participation.Status.ACCEPTED,
+            Participation.Status.ATTENDED,
+            Participation.Status.MISSED,
+        )
+
+        # для табов organizer/participant/ratings/all отдаём ленту событий
+        # (organized/joined/attended/missed/rated/cancelled), а не список активностей
+        EVENT_TABS = ('organizer', 'participant', 'ratings', 'all')
+        if tab in EVENT_TABS:
+            return self._events_response(request, user, tab, limit, cursor)
+
         if tab == 'created':
             queryset = Activity.objects.filter(
                 organizer=user
@@ -173,7 +191,6 @@ class UserHistoryView(APIView):
 
         elif tab == 'upcoming':
             # активности где пользователь участник и они ещё не прошли
-            from participation.models import Participation
             activity_ids = Participation.objects.filter(
                 user=user,
                 status='accepted',
@@ -186,7 +203,6 @@ class UserHistoryView(APIView):
 
         elif tab == 'attended':
             # активности где посещение подтверждено
-            from participation.models import Participation
             activity_ids = Participation.objects.filter(
                 user=user,
                 status='attended',
@@ -197,7 +213,13 @@ class UserHistoryView(APIView):
 
         else:
             return Response(
-                {'error': {'code': 'INVALID_TAB', 'message': 'Допустимые значения: created, future_created, upcoming, attended'}},
+                {'error': {
+                    'code': 'INVALID_TAB',
+                    'message': (
+                        'Допустимые значения: created, future_created, upcoming, '
+                        'attended, organizer, participant, ratings, all'
+                    ),
+                }},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -214,6 +236,134 @@ class UserHistoryView(APIView):
 
         return Response({
             'items': ActivityListItemSerializer(items, many=True).data,
+            'next_cursor': next_cursor,
+            'has_more': has_more,
+        })
+
+    def _events_response(self, request, user, tab, limit, cursor):
+        """
+        Возвращает ленту событий пользователя (organized/cancelled/joined/
+        attended/missed/rated). События синтезируются на лету из таблиц
+        Activity, Participation и ActivityRating — отдельной таблицы лога нет.
+
+        Курсор — ISO8601 timestamp; берём события строго раньше указанного времени.
+        Сортировка по occurred_at desc.
+        """
+        from datetime import datetime
+        from participation.models import Participation
+        from ratings.models import ActivityRating
+        from activities.views import _aggregate_participations
+
+        events = []
+
+        if tab in ('organizer', 'all'):
+            organized = Activity.objects.filter(
+                organizer=user,
+            ).select_related('organizer')
+            for a in organized:
+                events.append({
+                    'type': 'organized',
+                    'occurred_at': a.created_at,
+                    'activity': a,
+                })
+                if a.status == Activity.Status.CANCELLED and a.cancelled_at:
+                    events.append({
+                        'type': 'cancelled',
+                        'occurred_at': a.cancelled_at,
+                        'activity': a,
+                    })
+
+        if tab in ('participant', 'all'):
+            _PARTICIPATED = (
+                Participation.Status.ACCEPTED,
+                Participation.Status.ATTENDED,
+                Participation.Status.MISSED,
+            )
+            participations = Participation.objects.filter(
+                user=user,
+                status__in=_PARTICIPATED,
+            ).select_related('activity', 'activity__organizer')
+            for p in participations:
+                events.append({
+                    'type': 'joined',
+                    'occurred_at': p.created_at,
+                    'activity': p.activity,
+                })
+                if p.status == Participation.Status.ATTENDED:
+                    # attendance_marked_at может быть None если статус выставился
+                    # каким-то иным путём — fallback на updated_at
+                    events.append({
+                        'type': 'attended',
+                        'occurred_at': p.attendance_marked_at or p.updated_at,
+                        'activity': p.activity,
+                    })
+                elif p.status == Participation.Status.MISSED:
+                    # missed выставляет Celery-задача, updated_at это последнее
+                    # изменение записи — близко к моменту установки missed
+                    events.append({
+                        'type': 'missed',
+                        'occurred_at': p.updated_at,
+                        'activity': p.activity,
+                    })
+
+        if tab in ('ratings', 'all'):
+            ratings = ActivityRating.objects.filter(
+                user=user,
+            ).select_related('activity', 'activity__organizer')
+            for r in ratings:
+                events.append({
+                    'type': 'rated',
+                    'occurred_at': r.created_at,
+                    'activity': r.activity,
+                    'rating': r.rating,
+                    'rating_comment': r.comment,
+                })
+
+        # сортировка по времени, новые сверху
+        events.sort(key=lambda e: e['occurred_at'], reverse=True)
+
+        # курсорная пагинация: events с occurred_at < cursor
+        if cursor:
+            try:
+                cursor_dt = datetime.fromisoformat(cursor.replace('Z', '+00:00'))
+                events = [e for e in events if e['occurred_at'] < cursor_dt]
+            except ValueError:
+                return Response(
+                    {'error': {'code': 'INVALID_CURSOR', 'message': 'Курсор должен быть в формате ISO8601'}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # +1 чтобы понять есть ли ещё страница
+        page = events[:limit + 1]
+        has_more = len(page) > limit
+        if has_more:
+            page = page[:limit]
+
+        next_cursor = page[-1]['occurred_at'].isoformat() if has_more and page else None
+
+        # батчевый pre-fetch счётчиков для всех активностей на странице
+        activity_ids = list({e['activity'].id for e in page})
+        real_count, pending_count, _, _ = _aggregate_participations(activity_ids)
+        ctx = {
+            'request': request,
+            'participants_counts': real_count,
+            'pending_counts': pending_count,
+        }
+
+        items = []
+        for e in page:
+            item = {
+                'type': e['type'],
+                'occurred_at': e['occurred_at'].isoformat(),
+                'activity': ActivityListItemSerializer(e['activity'], context=ctx).data,
+            }
+            if e['type'] == 'rated':
+                item['rating'] = e['rating']
+                item['rating_comment'] = e.get('rating_comment')
+            items.append(item)
+
+        return Response({
+            'items': items,
             'next_cursor': next_cursor,
             'has_more': has_more,
         })

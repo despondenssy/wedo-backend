@@ -62,9 +62,10 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "avatar_file_id": { "type": "string", "nullable": true },
-          "rating": { "type": "number" }
+          "rating": { "type": "number" },
+          "is_deleted": { "type": "boolean", "description": "true если аккаунт пользователя удалён (name заменён на «Удалённый пользователь», переход на профиль возвращает 404)" }
         },
-        "required": ["id", "name", "rating"]
+        "required": ["id", "name", "rating", "is_deleted"]
       },
       "AttendanceHistory": {
         "type": "object",
@@ -212,6 +213,7 @@
           "title": { "type": "string" },
           "start_at": { "type": "string", "format": "date-time" },
           "end_at": { "type": "string", "format": "date-time" },
+          "time_zone": { "type": "string", "description": "IANA timezone of the activity, e.g. Europe/Moscow" },
           "format": { "type": "string", "enum": ["online", "offline"] },
           "status": { "type": "string", "enum": ["active", "cancelled"] },
           "location": { "$ref": "#/components/schemas/ActivityLocation" },
@@ -221,13 +223,12 @@
           "photo_file_ids": { "type": "array", "items": { "type": "string" } },
           "organizer": { "$ref": "#/components/schemas/UserSnippet" },
           "participants_count": { "type": "integer" },
-          "max_participants": { "type": "integer", "nullable": true },
           "requires_approval": { "type": "boolean" },
           "preferences": { "allOf": [{ "$ref": "#/components/schemas/ActivityPreferences" }], "nullable": true },
           "pending_requests_count": { "type": "integer", "nullable": true },
           "price": { "type": "number" }
         },
-        "required": ["id", "title", "start_at", "end_at", "format", "status", "location", "category_id", "photo_file_ids", "organizer", "participants_count", "requires_approval", "price"]
+        "required": ["id", "title", "start_at", "end_at", "time_zone", "format", "status", "location", "category_id", "photo_file_ids", "organizer", "participants_count", "requires_approval", "price"]
       },
       "ActivityDetail": {
         "allOf": [
@@ -490,25 +491,39 @@
         },
         "required": ["items"]
       },
-      "UserActivityFeedEvent": {
+      "DeclineOrganizershipResponse": {
         "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "user_id": { "type": "string" },
-          "activity_id": { "type": "string" },
-          "type": { "type": "string", "enum": ["created", "attended", "rated", "cancelled", "leaved", "joined", "missed"] },
-          "occurred_at": { "type": "string", "format": "date-time" },
-          "created_at": { "type": "string", "format": "date-time" },
-          "actor_user_id": { "type": "string", "nullable": true },
-          "metadata": { "type": "object" }
-        },
-        "required": ["id", "user_id", "activity_id", "type", "occurred_at", "created_at"]
+        "description": "204 No Content — текущий организатор отказался от роли; активность передана следующему участнику в очереди (либо отменена, если участников не осталось)."
       },
-      "UserActivityFeedResponse": {
+      "HistoryEvent": {
+        "type": "object",
+        "description": "Событие пользователя в его истории активности. Синтезируется на бэке из Activity/Participation/ActivityRating. Одна активность может появиться в ленте несколько раз — отдельным событием на каждое действие пользователя.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["organized", "cancelled", "joined", "attended", "missed", "rated"],
+            "description": "organized/cancelled — пользователь как организатор; joined/attended/missed — как участник; rated — оставил оценку"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Момент действия. Для organized — activity.created_at, cancelled — activity.cancelled_at, joined — participation.created_at, attended — participation.attendance_marked_at, missed — момент перевода в missed, rated — rating.created_at"
+          },
+          "activity": { "$ref": "#/components/schemas/ActivityListItem" },
+          "rating": { "type": "integer", "nullable": true, "description": "Заполняется только для type=rated" },
+          "rating_comment": { "type": "string", "nullable": true, "description": "Заполняется только для type=rated" }
+        },
+        "required": ["type", "occurred_at", "activity"]
+      },
+      "HistoryEventResponse": {
         "type": "object",
         "properties": {
-          "items": { "type": "array", "items": { "$ref": "#/components/schemas/UserActivityFeedEvent" } },
-          "next_cursor": { "type": "string", "nullable": true },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/HistoryEvent" } },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO8601 timestamp последнего события на странице. Передать в cursor чтобы получить следующую страницу."
+          },
           "has_more": { "type": "boolean" }
         },
         "required": ["items", "has_more"]
@@ -711,38 +726,23 @@
       "get": {
         "tags": ["users"],
         "summary": "Get my activities",
+        "description": "Форма ответа зависит от tab. Для tab=organizer|participant|ratings|all возвращается лента событий (HistoryEventResponse). Для остальных табов — обычный список активностей (ActivityListResponse).",
         "parameters": [
-          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "upcoming", "attended"] } },
+          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "future_created", "upcoming", "attended", "organizer", "participant", "ratings", "all"] } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "description": "Для event-табов — ISO8601 timestamp; для обычных — id." } }
         ],
         "responses": {
           "200": {
-            "description": "My activities page",
+            "description": "My activities page (ActivityListResponse для обычных табов, HistoryEventResponse для organizer/participant/ratings/all)",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/me/activity-feed": {
-      "get": {
-        "tags": ["activities"],
-        "summary": "Get my activity feed",
-        "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
-          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["organizer", "participant", "ratings"] } }
-        ],
-        "responses": {
-          "200": {
-            "description": "My activity feed",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserActivityFeedResponse" }
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/ActivityListResponse" },
+                    { "$ref": "#/components/schemas/HistoryEventResponse" }
+                  ]
+                }
               }
             }
           }
@@ -803,18 +803,24 @@
       "get": {
         "tags": ["users"],
         "summary": "Get user activity history",
+        "description": "Форма ответа зависит от tab. Для tab=organizer|participant|ratings|all возвращается лента событий (HistoryEventResponse) — одна активность может присутствовать несколько раз, по событию на действие. Для остальных табов (created/future_created/upcoming/attended) — обычный список активностей (ActivityListResponse).",
         "parameters": [
           { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "upcoming", "attended"] } },
+          { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "future_created", "upcoming", "attended", "organizer", "participant", "ratings", "all"] } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "description": "Для event-табов — ISO8601 timestamp последнего события предыдущей страницы. Для обычных табов — id." } }
         ],
         "responses": {
           "200": {
-            "description": "Activity history page",
+            "description": "Activity history page (ActivityListResponse для обычных табов, HistoryEventResponse для organizer/participant/ratings/all)",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/ActivityListResponse" },
+                    { "$ref": "#/components/schemas/HistoryEventResponse" }
+                  ]
+                }
               }
             }
           }
@@ -864,28 +870,6 @@
         }
       }
     },
-    "/users/{user_id}/activity-feed": {
-      "get": {
-        "tags": ["activities"],
-        "summary": "Get user activity feed",
-        "parameters": [
-          { "name": "user_id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
-          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["organizer", "participant", "ratings"] } }
-        ],
-        "responses": {
-          "200": {
-            "description": "User activity feed",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserActivityFeedResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
     "/qr-tokens/resolve": {
       "post": {
         "tags": ["users"],
@@ -915,6 +899,7 @@
         "tags": ["activities"],
         "summary": "List activities",
         "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string", "description": "Text search: substring (case-insensitive) in title, description, category_id and subcategory_id" } },
           { "name": "category_id", "in": "query", "schema": { "type": "string" } },
           { "name": "subcategory_id", "in": "query", "schema": { "type": "string" } },
           { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["online", "offline"] } },
@@ -1101,6 +1086,21 @@
               }
             }
           }
+        }
+      }
+    },
+    "/activities/{activity_id}/decline-organizership": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Decline organizership",
+        "description": "Текущий организатор отказывается от роли. Активность передаётся следующему по дате присоединения accepted-участнику. Если участников нет — активность отменяется и оставшимся (включая pending) уходит уведомление.",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Organizership transferred or activity cancelled" },
+          "400": { "description": "Activity is not active (already cancelled/finished)" },
+          "403": { "description": "Caller is not the current organizer" }
         }
       }
     },

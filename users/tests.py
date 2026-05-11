@@ -201,6 +201,77 @@ def test_user_history_my_activities_rating_and_attendance(
     assert invalid_tab.status_code == status.HTTP_400_BAD_REQUEST
 
 
+def test_user_history_event_log_tabs(
+    auth_client,
+    user,
+    activity_factory,
+    participation_factory,
+    rating_factory,
+):
+    """
+    Новые табы /history?tab=organizer|participant|ratings|all возвращают
+    ленту событий пользователя (organized/joined/attended/rated/...).
+    На одну активность может приходиться несколько событий.
+    """
+    # организовал
+    organized = activity_factory(organizer=user)
+
+    # организовал и потом отменил — два события
+    org_and_cancel = activity_factory(
+        organizer=user,
+        status=Activity.Status.CANCELLED,
+        cancelled_at=timezone.now(),
+    )
+
+    # участвовал — посетил — оценил: три события на одну активность
+    full_cycle = activity_factory()
+    participation_factory(full_cycle, user, status=Participation.Status.ATTENDED)
+    rating_factory(full_cycle, user, rating=5, comment='Класс')
+
+    # шум
+    activity_factory()  # чужая
+    pending_only = activity_factory()
+    participation_factory(pending_only, user, status=Participation.Status.PENDING)
+
+    def events_for(tab):
+        r = auth_client.get(f'/users/{user.id}/history?tab={tab}')
+        assert r.status_code == status.HTTP_200_OK, r.json()
+        return r.json()['items']
+
+    # organizer — два события про organized + одно cancelled
+    organizer_events = events_for('organizer')
+    organizer_types = sorted(e['type'] for e in organizer_events)
+    assert organizer_types == ['cancelled', 'organized', 'organized']
+
+    # participant — joined и attended на full_cycle
+    participant_events = events_for('participant')
+    participant_types = sorted(e['type'] for e in participant_events)
+    assert participant_types == ['attended', 'joined']
+
+    # ratings — одно событие про оценку, с рейтингом и комментом
+    rating_events = events_for('ratings')
+    assert len(rating_events) == 1
+    r0 = rating_events[0]
+    assert r0['type'] == 'rated'
+    assert r0['rating'] == 5
+    assert r0['rating_comment'] == 'Класс'
+
+    # каждое событие содержит полную карточку активности
+    assert 'activity' in r0
+    assert r0['activity']['id'] == str(full_cycle.id)
+
+    # all — объединение всех событий, отсортированных по occurred_at desc
+    all_events = events_for('all')
+    assert len(all_events) == 6  # 2 organized + 1 cancelled + 1 joined + 1 attended + 1 rated
+    # сортировка по времени, новые сверху
+    timestamps = [e['occurred_at'] for e in all_events]
+    assert timestamps == sorted(timestamps, reverse=True)
+
+    # pending в ленте не появляется
+    all_activity_ids = {e['activity']['id'] for e in all_events}
+    assert str(pending_only.id) not in all_activity_ids
+
+
 def test_user_history_future_created_tab(
     auth_client,
     user,

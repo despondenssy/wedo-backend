@@ -1,7 +1,6 @@
 import pytest
 from rest_framework import status
 
-from activities.models import UserActivityFeedEvent
 from participation.models import Participation
 from ratings.models import ActivityRating
 
@@ -27,7 +26,6 @@ def test_rating_list_create_recalculate_and_duplicate(
 
     assert created.status_code == status.HTTP_201_CREATED
     assert ActivityRating.objects.filter(activity=activity, user=user).exists()
-    assert UserActivityFeedEvent.objects.filter(user=user, activity=activity, type='rated').exists()
     assert activity.organizer.rating > 0
 
     duplicate = auth_client.post(

@@ -10,7 +10,7 @@ import django
 
 django.setup()
 
-from activities.models import Activity, SavedActivity, UserActivityFeedEvent
+from activities.models import Activity, SavedActivity
 from notifications.models import DeviceToken, Notification
 from participation.models import Participation
 from ratings.models import ActivityRating
@@ -44,9 +44,6 @@ def main():
     deleted['saved_activities'] = SavedActivity.objects.filter(
         user_id__in=user_ids,
     ).delete()[0] + SavedActivity.objects.filter(activity_id__in=activity_ids).delete()[0]
-    deleted['feed_events'] = UserActivityFeedEvent.objects.filter(
-        user_id__in=user_ids,
-    ).delete()[0] + UserActivityFeedEvent.objects.filter(activity_id__in=activity_ids).delete()[0]
     deleted['qr_tokens'] = QrToken.objects.filter(user_id__in=user_ids).delete()[0]
     deleted['device_tokens'] = DeviceToken.objects.filter(user_id__in=user_ids).delete()[0]
     deleted['activities'] = activities.delete()[0]

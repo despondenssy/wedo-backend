@@ -32,17 +32,16 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
     preferences = serializers.SerializerMethodField()
     participants_count = serializers.SerializerMethodField()
     pending_requests_count = serializers.SerializerMethodField()
-    max_participants = serializers.SerializerMethodField()
     cover_photo_file_id = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
         fields = [
-            'id', 'title', 'start_at', 'end_at', 'format', 'status',
+            'id', 'title', 'start_at', 'end_at', 'time_zone', 'format', 'status',
             'location', 'category_id', 'subcategory_id', 'cover_photo_file_id',
             'photo_file_ids', 'organizer', 'participants_count', 'pending_requests_count',
-            'max_participants', 'requires_approval', 'preferences', 'price',
+            'requires_approval', 'preferences', 'price',
         ]
 
     def get_location(self, obj):
@@ -76,9 +75,6 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
             activity=obj,
             status='pending',
         ).count()
-
-    def get_max_participants(self, obj):
-        return obj.pref_max_participants
 
     def get_cover_photo_file_id(self, obj):
         return obj.photo_file_ids[0] if obj.photo_file_ids else None

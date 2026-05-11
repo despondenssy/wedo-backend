@@ -238,22 +238,6 @@ def qr_token_factory(db):
 
 
 @pytest.fixture
-def feed_event_factory(db):
-    def create_feed_event(user, activity, type='created', **kwargs):
-        from activities.models import UserActivityFeedEvent
-
-        return UserActivityFeedEvent.objects.create(
-            user=user,
-            activity=activity,
-            type=type,
-            occurred_at=kwargs.pop('occurred_at', timezone.now()),
-            **kwargs,
-        )
-
-    return create_feed_event
-
-
-@pytest.fixture
 def activity_payload():
     start = timezone.now() + timedelta(days=7)
     end = start + timedelta(hours=2)

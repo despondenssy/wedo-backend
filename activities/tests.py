@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from activities.models import Activity, SavedActivity, UserActivityFeedEvent
+from activities.models import Activity, SavedActivity
 from participation.models import Participation
 
 
@@ -82,7 +82,6 @@ def test_activity_detail_patch_delete_cancel_and_permissions(
     activity.refresh_from_db()
     assert cancelled.status_code == status.HTTP_200_OK
     assert activity.status == Activity.Status.CANCELLED
-    assert UserActivityFeedEvent.objects.filter(user=user, activity=activity, type='cancelled').exists()
 
     deletable = activity_factory(organizer=user)
     deleted = api_client.delete(f'/activities/{deletable.id}')
@@ -421,7 +420,7 @@ def test_activity_list_timezone_offset_fractional(auth_client, activity_factory)
     assert str(moscow.id) not in ids
 
 
-def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
+def test_activity_create_persists_payload(auth_client, user, activity_payload):
     created = auth_client.post('/activities', activity_payload, format='json')
 
     assert created.status_code == status.HTTP_201_CREATED
@@ -429,11 +428,6 @@ def test_activity_create_adds_feed_event(auth_client, user, activity_payload):
     assert body['category_id'] == 'sport'
     assert body['preferences']['age_from'] == 18
     assert body['preferences']['max_participants'] == 5
-    assert UserActivityFeedEvent.objects.filter(
-        user=user,
-        activity_id=body['id'],
-        type='created',
-    ).exists()
 
 
 def test_activity_list_invalid_cursor_returns_400(auth_client, activity_factory):
@@ -450,21 +444,3 @@ def test_activity_list_invalid_cursor_returns_400(auth_client, activity_factory)
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
-def test_activity_feed_list_filters(
-    auth_client,
-    user,
-    other_user,
-    activity,
-    feed_event_factory,
-):
-    organizer_event = feed_event_factory(user, activity, type='created')
-    feed_event_factory(user, activity, type='rated')
-    feed_event_factory(other_user, activity, type='joined')
-
-    mine = auth_client.get('/me/activity-feed?category=organizer')
-    assert mine.status_code == status.HTTP_200_OK
-    assert [item['id'] for item in mine.json()['items']] == [str(organizer_event.id)]
-
-    user_feed = auth_client.get(f'/users/{other_user.id}/activity-feed?category=participant')
-    assert user_feed.status_code == status.HTTP_200_OK
-    assert len(user_feed.json()['items']) == 1

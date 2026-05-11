@@ -3,7 +3,6 @@ from unittest.mock import patch
 import pytest
 from rest_framework import status
 
-from activities.models import UserActivityFeedEvent
 from participation.models import Participation
 
 
@@ -25,11 +24,6 @@ def test_join_success_duplicate_requires_approval_full_and_organizer_forbidden(
         activity=open_activity,
         user=user,
         status=Participation.Status.ACCEPTED,
-    ).exists()
-    assert UserActivityFeedEvent.objects.filter(
-        user=user,
-        activity=open_activity,
-        type='joined',
     ).exists()
 
     duplicate = auth_client.post(f'/activities/{open_activity.id}/join', {}, format='json')
@@ -159,22 +153,12 @@ def test_participants_leave_and_manual_attendance(
     assert attended.status_code == status.HTTP_204_NO_CONTENT
     assert participation.status == Participation.Status.ATTENDED
     assert participation.attendance_marked_at is not None
-    assert UserActivityFeedEvent.objects.filter(
-        user=user,
-        activity=activity,
-        type='attended',
-    ).exists()
 
     accepted = participation_factory(activity_factory(organizer=other_user), user, status=Participation.Status.ACCEPTED)
     api_client.force_authenticate(user=user)
     left = api_client.delete(f'/activities/{accepted.activity_id}/participants/me')
     assert left.status_code == status.HTTP_204_NO_CONTENT
     assert not Participation.objects.filter(id=accepted.id).exists()
-    assert UserActivityFeedEvent.objects.filter(
-        user=user,
-        activity=accepted.activity,
-        type='leaved',
-    ).exists()
 
 
 def test_manual_attendance_requires_organizer_and_user_id(

@@ -13,7 +13,6 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
 
-from .feed_views import create_feed_event
 from .models import Activity, SavedActivity
 from .serializers import (
     ActivityListItemSerializer,
@@ -418,7 +417,6 @@ class ActivityListView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         activity = serializer.save()
-        create_feed_event(request.user, activity, 'created')
 
         # уведомление подписчикам организатора — в фоне, чтобы не задерживать ответ
         from notifications.tasks import notify_followers_of_new_activity
@@ -484,8 +482,6 @@ class ActivityCancelView(APIView):
         activity.status = Activity.Status.CANCELLED
         activity.cancelled_at = timezone.now()
         activity.save()
-        
-        create_feed_event(request.user, activity, 'cancelled')
 
         return Response(ActivityDetailSerializer(activity, context={'request': request}).data)
 
