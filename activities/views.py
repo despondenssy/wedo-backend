@@ -235,124 +235,159 @@ class ActivityDeclineOrganizershipView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def apply_activity_filters(
+    queryset,
+    request,
+    *,
+    effective_city_settlement=None,
+    effective_city_region=None,
+    effective_city_country=None,
+):
+    """
+    Применяет SQL- и in-memory-фильтры к queryset активностей.
+
+    НЕ делает: сортировку, пагинацию, подстановку города пользователя.
+    Если вызывающему нужен auto-fill города из user.city — пусть передаст
+    через effective_city_*.
+
+    Используется на разных списочных endpoint'ах (`/activities`, `/me/my-activities`,
+    `/users/<id>/history`), чтобы фильтры применялись консистентно.
+    """
+    q = request.query_params.get('q')
+    category_id = request.query_params.get('category_id')
+    subcategory_id = request.query_params.get('subcategory_id')
+    format_ = request.query_params.get('format')
+    date_from = request.query_params.get('date_from')
+    date_to = request.query_params.get('date_to')
+    time_from = request.query_params.get('time_from')
+    time_to = request.query_params.get('time_to')
+    level = request.query_params.get('level')
+    gender = request.query_params.get('gender')
+    age_from = request.query_params.get('age_from')
+    age_to = request.query_params.get('age_to')
+    requires_approval = request.query_params.get('requires_approval')
+    only_available = request.query_params.get('only_available')
+    price_to = request.query_params.get('price_to')
+    max_participants = request.query_params.get('max_participants')
+    timezone_offset_from = request.query_params.get('time_zone_offset_from')
+    timezone_offset_to = request.query_params.get('time_zone_offset_to')
+
+    # текстовый поиск
+    if q:
+        q_trimmed = q.strip()
+        if q_trimmed:
+            queryset = queryset.filter(
+                Q(title__icontains=q_trimmed) |
+                Q(description__icontains=q_trimmed) |
+                Q(category_id__icontains=q_trimmed) |
+                Q(subcategory_id__icontains=q_trimmed)
+            )
+
+    if category_id:
+        queryset = queryset.filter(category_id=category_id)
+    if subcategory_id:
+        queryset = queryset.filter(subcategory_id=subcategory_id)
+    if format_:
+        queryset = queryset.filter(format=format_)
+
+    if effective_city_settlement:
+        queryset = queryset.filter(location_settlement__icontains=effective_city_settlement)
+    if effective_city_region:
+        queryset = queryset.filter(location_region__icontains=effective_city_region)
+    if effective_city_country:
+        queryset = queryset.filter(location_country__icontains=effective_city_country)
+
+    if date_from:
+        queryset = queryset.filter(start_at__date__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(start_at__date__lte=date_to)
+    if time_from:
+        queryset = queryset.filter(start_at__time__gte=time_from)
+    if time_to:
+        queryset = queryset.filter(start_at__time__lte=time_to)
+    if level:
+        queryset = queryset.filter(pref_level=level)
+    if gender:
+        queryset = queryset.filter(pref_gender=gender)
+    if age_from:
+        queryset = queryset.filter(pref_age_from__gte=age_from)
+    if age_to:
+        queryset = queryset.filter(pref_age_to__lte=age_to)
+    if requires_approval is not None:
+        queryset = queryset.filter(requires_approval=requires_approval == 'true')
+    if price_to:
+        queryset = queryset.filter(price__lte=price_to)
+    if max_participants:
+        queryset = queryset.filter(pref_max_participants__lte=max_participants)
+
+    # only_available: исключаем заполненные активности
+    if only_available == 'true':
+        candidates = list(queryset.values('id', 'pref_max_participants'))
+        candidate_ids = [c['id'] for c in candidates]
+        real_count, _, _, _ = _aggregate_participations(candidate_ids)
+        available_ids = [
+            c['id'] for c in candidates
+            if c['pref_max_participants'] is None
+            or real_count.get(c['id'], 0) < c['pref_max_participants']
+        ]
+        queryset = queryset.filter(id__in=available_ids)
+
+    # in-memory фильтр по часовому поясу — только для online,
+    # т.к. offset зависит от start_at и time_zone (с учётом DST)
+    if format_ == 'online' and (timezone_offset_from is not None or timezone_offset_to is not None):
+        min_offset = float(timezone_offset_from) if timezone_offset_from else float('-inf')
+        max_offset = float(timezone_offset_to) if timezone_offset_to else float('inf')
+
+        all_filtered = list(queryset.values('id', 'start_at', 'time_zone'))
+        matching_ids = []
+        for item in all_filtered:
+            offset = get_timezone_offset_hours(item['start_at'], item['time_zone'])
+            if offset is None:
+                continue
+            if min_offset <= offset <= max_offset:
+                matching_ids.append(item['id'])
+
+        queryset = queryset.filter(id__in=matching_ids)
+
+    return queryset
+
+
 class ActivityListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         queryset = Activity.objects.filter(status=Activity.Status.ACTIVE)
 
-        # фильтрация
-        q = request.query_params.get('q')
-        category_id = request.query_params.get('category_id')
-        subcategory_id = request.query_params.get('subcategory_id')
-        format_ = request.query_params.get('format')
-        city = request.query_params.get('city')
-        date_from = request.query_params.get('date_from')
-        date_to = request.query_params.get('date_to')
-        time_from = request.query_params.get('time_from')
-        time_to = request.query_params.get('time_to')
-        level = request.query_params.get('level')
-        gender = request.query_params.get('gender')
-        age_from = request.query_params.get('age_from')
-        age_to = request.query_params.get('age_to')
-        requires_approval = request.query_params.get('requires_approval')
-        only_available = request.query_params.get('only_available')
-        price_to = request.query_params.get('price_to')
-        max_participants = request.query_params.get('max_participants')
-        timezone_offset_from = request.query_params.get('time_zone_offset_from')
-        timezone_offset_to = request.query_params.get('time_zone_offset_to')
-
-        # текстовый поиск — ищем в названии, описании и категориях
-        if q:
-            q_trimmed = q.strip()
-            if q_trimmed:
-                queryset = queryset.filter(
-                    Q(title__icontains=q_trimmed) |
-                    Q(description__icontains=q_trimmed) |
-                    Q(category_id__icontains=q_trimmed) |
-                    Q(subcategory_id__icontains=q_trimmed)
-                )
-
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
-        if subcategory_id:
-            queryset = queryset.filter(subcategory_id=subcategory_id)
-        if format_:
-            queryset = queryset.filter(format=format_)
-
         # трёхуровневая геолокация: city содержит settlement, region, country
+        city = request.query_params.get('city')
         city_settlement = request.query_params.get('city_settlement') or city
         city_region = request.query_params.get('city_region')
         city_country = request.query_params.get('city_country')
 
-        # если фронт не передал город — подставляем город пользователя (как в рекомендациях)
-        if not city_settlement and request.user.city_settlement:
-            city_settlement = request.user.city_settlement
-        if not city_region and request.user.city_region:
-            city_region = request.user.city_region
-        if not city_country and request.user.city_country:
-            city_country = request.user.city_country
+        # Если фронт передал ХОТЯ БЫ ОДНО из четырёх городских полей,
+        # считаем что он явно задал геолокацию поиска — и НЕ подставляем
+        # ничего из профиля пользователя. Иначе ситуация «фронт прислал
+        # city_country=Spain, бэк дозаполнил settlement=Москва из профиля»
+        # ломает поиск. Если фронт не передал ничего — auto-fill города
+        # пользователя как поведение по умолчанию для главного списка.
+        explicit_city_filter = any(
+            request.query_params.get(param)
+            for param in ('city', 'city_settlement', 'city_region', 'city_country')
+        )
+        if not explicit_city_filter:
+            if request.user.city_settlement:
+                city_settlement = request.user.city_settlement
+            if request.user.city_region:
+                city_region = request.user.city_region
+            if request.user.city_country:
+                city_country = request.user.city_country
 
-        if city_settlement:
-            queryset = queryset.filter(location_settlement__icontains=city_settlement)
-        if city_region:
-            queryset = queryset.filter(location_region__icontains=city_region)
-        if city_country:
-            queryset = queryset.filter(location_country__icontains=city_country)
-
-        if date_from:
-            queryset = queryset.filter(start_at__date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(start_at__date__lte=date_to)
-        if time_from:
-            queryset = queryset.filter(start_at__time__gte=time_from)
-        if time_to:
-            queryset = queryset.filter(start_at__time__lte=time_to)
-        if level:
-            queryset = queryset.filter(pref_level=level)
-        if gender:
-            queryset = queryset.filter(pref_gender=gender)
-        if age_from:
-            queryset = queryset.filter(pref_age_from__gte=age_from)
-        if age_to:
-            queryset = queryset.filter(pref_age_to__lte=age_to)
-        if requires_approval is not None:
-            queryset = queryset.filter(requires_approval=requires_approval == 'true')
-        if price_to:
-            queryset = queryset.filter(price__lte=price_to)
-        if max_participants:
-            queryset = queryset.filter(pref_max_participants__lte=max_participants)
-
-        # only_available: исключаем заполненные активности
-        if only_available == 'true':
-            # один запрос: id + max_participants для всех кандидатов
-            candidates = list(queryset.values('id', 'pref_max_participants'))
-            candidate_ids = [c['id'] for c in candidates]
-            real_count, _, _, _ = _aggregate_participations(candidate_ids)
-            available_ids = [
-                c['id'] for c in candidates
-                if c['pref_max_participants'] is None
-                or real_count.get(c['id'], 0) < c['pref_max_participants']
-            ]
-            queryset = queryset.filter(id__in=available_ids)
-
-        # --- in-memory фильтр по часовому поясу (только для online) ---
-        # Применяется после SQL-фильтров, т.к. offset зависит от start_at и time_zone
-        if format_ == 'online' and (timezone_offset_from is not None or timezone_offset_to is not None):
-            min_offset = float(timezone_offset_from) if timezone_offset_from else float('-inf')
-            max_offset = float(timezone_offset_to) if timezone_offset_to else float('inf')
-
-            # Загружаем id и нужные поля в память для вычисления offset
-            all_filtered = list(queryset.values('id', 'start_at', 'time_zone'))
-            matching_ids = []
-            for item in all_filtered:
-                offset = get_timezone_offset_hours(item['start_at'], item['time_zone'])
-                if offset is None:
-                    continue  # неизвестная таймзона — пропускаем
-                if min_offset <= offset <= max_offset:
-                    matching_ids.append(item['id'])
-
-            queryset = queryset.filter(id__in=matching_ids)
+        queryset = apply_activity_filters(
+            queryset, request,
+            effective_city_settlement=city_settlement,
+            effective_city_region=city_region,
+            effective_city_country=city_country,
+        )
 
         # --- сортировка ---
         sort = request.query_params.get('sort', 'created_at')

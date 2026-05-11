@@ -272,6 +272,58 @@ def test_user_history_event_log_tabs(
     assert str(pending_only.id) not in all_activity_ids
 
 
+def test_user_history_filters_apply_to_old_tabs(
+    auth_client,
+    user,
+    activity_factory,
+):
+    """
+    Старые табы (created/upcoming/attended/future_created) принимают тот же
+    набор фильтров что и /activities — q, category_id, format и т.д.
+    """
+    activity_factory(organizer=user, title='Моя йога', category_id='sport', subcategory_id='yoga')
+    activity_factory(organizer=user, title='Мой концерт', category_id='music', subcategory_id='guitar')
+
+    response = auth_client.get(f'/users/{user.id}/history?tab=created&q=йога')
+    assert response.status_code == status.HTTP_200_OK
+    titles = [item['title'] for item in response.json()['items']]
+    assert 'Моя йога' in titles
+    assert 'Мой концерт' not in titles
+
+    by_category = auth_client.get(f'/users/{user.id}/history?tab=created&category_id=music')
+    titles = [item['title'] for item in by_category.json()['items']]
+    assert 'Мой концерт' in titles
+    assert 'Моя йога' not in titles
+
+
+def test_user_history_filters_apply_to_event_tabs(
+    auth_client,
+    user,
+    activity_factory,
+    participation_factory,
+    rating_factory,
+):
+    """
+    Новые event-табы (all/organizer/participant/ratings) тоже принимают
+    фильтры — фильтр применяется к базовым активностям, события синтезируются
+    только из прошедших фильтр.
+    """
+    sport = activity_factory(organizer=user, category_id='sport', subcategory_id='yoga', title='Йога')
+    music = activity_factory(category_id='music', subcategory_id='guitar', title='Гитара')
+    participation_factory(music, user, status=Participation.Status.ATTENDED)
+    rating_factory(music, user, rating=5)
+
+    response = auth_client.get(f'/users/{user.id}/history?tab=all&category_id=music')
+    assert response.status_code == status.HTTP_200_OK
+    activity_ids = {e['activity']['id'] for e in response.json()['items']}
+    # йога не пройдёт фильтр — событий о ней не будет
+    assert str(sport.id) not in activity_ids
+    # гитара пройдёт — её события (joined/attended/rated) увидим
+    assert str(music.id) in activity_ids
+    types = [e['type'] for e in response.json()['items']]
+    assert 'rated' in types
+
+
 def test_user_history_future_created_tab(
     auth_client,
     user,

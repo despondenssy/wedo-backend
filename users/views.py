@@ -223,6 +223,18 @@ class UserHistoryView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # применяем стандартный набор фильтров (q, category_id, format, date_*,
+        # city_*, time_zone_offset_* и пр.) — те же что и на /activities.
+        # Город из профиля юзера auto-fill'ом НЕ подставляем — здесь смотрят
+        # свою историю, а не «события рядом со мной».
+        from activities.views import apply_activity_filters
+        queryset = apply_activity_filters(
+            queryset, request,
+            effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
+            effective_city_region=request.query_params.get('city_region'),
+            effective_city_country=request.query_params.get('city_country'),
+        )
+
         if cursor:
             queryset = queryset.filter(id__lt=cursor)
 
@@ -248,73 +260,107 @@ class UserHistoryView(APIView):
 
         Курсор — ISO8601 timestamp; берём события строго раньше указанного времени.
         Сортировка по occurred_at desc.
+
+        Фильтры (q, category_id, date_*, format, city_*, и т.д. — те же что
+        на /activities) применяются к активностям, из которых синтезируются
+        события. Город из профиля юзера тут не подставляется.
         """
         from datetime import datetime
         from participation.models import Participation
         from ratings.models import ActivityRating
-        from activities.views import _aggregate_participations
+        from activities.views import _aggregate_participations, apply_activity_filters
 
-        events = []
+        # 1) собираем сырые "взаимодействия" пользователя с активностями.
+        #    На этом шаге фильтры по полям активности ещё не применяются.
+        _PARTICIPATED = (
+            Participation.Status.ACCEPTED,
+            Participation.Status.ATTENDED,
+            Participation.Status.MISSED,
+        )
+
+        organizer_activity_ids = set()
+        participation_by_activity = {}
+        rating_by_activity = {}
 
         if tab in ('organizer', 'all'):
-            organized = Activity.objects.filter(
-                organizer=user,
-            ).select_related('organizer')
-            for a in organized:
-                events.append({
-                    'type': 'organized',
-                    'occurred_at': a.created_at,
-                    'activity': a,
-                })
-                if a.status == Activity.Status.CANCELLED and a.cancelled_at:
-                    events.append({
-                        'type': 'cancelled',
-                        'occurred_at': a.cancelled_at,
-                        'activity': a,
-                    })
+            organizer_activity_ids = set(
+                Activity.objects.filter(organizer=user).values_list('id', flat=True)
+            )
 
         if tab in ('participant', 'all'):
-            _PARTICIPATED = (
-                Participation.Status.ACCEPTED,
-                Participation.Status.ATTENDED,
-                Participation.Status.MISSED,
-            )
-            participations = Participation.objects.filter(
-                user=user,
-                status__in=_PARTICIPATED,
-            ).select_related('activity', 'activity__organizer')
-            for p in participations:
+            for p in Participation.objects.filter(
+                user=user, status__in=_PARTICIPATED,
+            ):
+                participation_by_activity[p.activity_id] = p
+
+        if tab in ('ratings', 'all'):
+            for r in ActivityRating.objects.filter(user=user):
+                rating_by_activity[r.activity_id] = r
+
+        relevant_activity_ids = (
+            organizer_activity_ids
+            | set(participation_by_activity.keys())
+            | set(rating_by_activity.keys())
+        )
+
+        if not relevant_activity_ids:
+            return Response({'items': [], 'next_cursor': None, 'has_more': False})
+
+        # 2) применяем стандартные фильтры к набору этих активностей.
+        #    Активности, не прошедшие фильтр, не дадут ни одного события.
+        filtered_qs = Activity.objects.filter(
+            id__in=relevant_activity_ids,
+        ).select_related('organizer')
+        filtered_qs = apply_activity_filters(
+            filtered_qs, request,
+            effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
+            effective_city_region=request.query_params.get('city_region'),
+            effective_city_country=request.query_params.get('city_country'),
+        )
+        activities_by_id = {a.id: a for a in filtered_qs}
+
+        # 3) синтезируем события только из отфильтрованных активностей
+        events = []
+        for activity_id, activity in activities_by_id.items():
+            if activity_id in organizer_activity_ids:
+                events.append({
+                    'type': 'organized',
+                    'occurred_at': activity.created_at,
+                    'activity': activity,
+                })
+                if activity.status == Activity.Status.CANCELLED and activity.cancelled_at:
+                    events.append({
+                        'type': 'cancelled',
+                        'occurred_at': activity.cancelled_at,
+                        'activity': activity,
+                    })
+
+            if activity_id in participation_by_activity:
+                p = participation_by_activity[activity_id]
                 events.append({
                     'type': 'joined',
                     'occurred_at': p.created_at,
-                    'activity': p.activity,
+                    'activity': activity,
                 })
                 if p.status == Participation.Status.ATTENDED:
-                    # attendance_marked_at может быть None если статус выставился
-                    # каким-то иным путём — fallback на updated_at
                     events.append({
                         'type': 'attended',
                         'occurred_at': p.attendance_marked_at or p.updated_at,
-                        'activity': p.activity,
+                        'activity': activity,
                     })
                 elif p.status == Participation.Status.MISSED:
-                    # missed выставляет Celery-задача, updated_at это последнее
-                    # изменение записи — близко к моменту установки missed
                     events.append({
                         'type': 'missed',
                         'occurred_at': p.updated_at,
-                        'activity': p.activity,
+                        'activity': activity,
                     })
 
-        if tab in ('ratings', 'all'):
-            ratings = ActivityRating.objects.filter(
-                user=user,
-            ).select_related('activity', 'activity__organizer')
-            for r in ratings:
+            if activity_id in rating_by_activity:
+                r = rating_by_activity[activity_id]
                 events.append({
                     'type': 'rated',
                     'occurred_at': r.created_at,
-                    'activity': r.activity,
+                    'activity': activity,
                     'rating': r.rating,
                     'rating_comment': r.comment,
                 })
