@@ -454,6 +454,8 @@ def test_decline_organizership_passes_activity_to_next_participant(
     """
     Текущий организатор может отказаться через POST /decline-organizership.
     Активность переходит к следующему участнику по дате присоединения.
+    Бывший организатор остаётся в активности как обычный accepted-участник —
+    если не захочет идти, может выйти стандартным DELETE /participants/me.
     """
     from datetime import timedelta
     from django.utils import timezone
@@ -475,6 +477,13 @@ def test_decline_organizership_passes_activity_to_next_participant(
     activity.refresh_from_db()
     assert activity.status == Activity.Status.ACTIVE
     assert activity.organizer_id == next_in_line.id
+
+    # бывший организатор остался в активности как accepted-участник
+    assert Participation.objects.filter(
+        activity=activity,
+        user=user,
+        status=Participation.Status.ACCEPTED,
+    ).exists()
 
 
 def test_decline_organizership_cancels_when_no_one_left(
@@ -546,7 +555,7 @@ def test_user_snippet_includes_is_deleted_flag(api_client, user, activity_factor
     assert detail_after.json()['organizer']['is_deleted'] is True
 
 
-def test_qr_token_resolve_and_scan(
+def test_qr_token_issue_and_scan(
     auth_client,
     api_client,
     user,
@@ -561,31 +570,94 @@ def test_qr_token_resolve_and_scan(
     assert 'expires_at' in created_body
     assert QrToken.objects.filter(user=user).count() == 1
 
-    resolver = api_client
-    resolver.force_authenticate(user=other_user)
-    resolved = resolver.post('/qr-tokens/resolve', {'token': created_body['token']}, format='json')
-    assert resolved.status_code == status.HTTP_200_OK
-    assert resolved.json()['user']['id'] == str(user.id)
-
     activity = activity_factory(organizer=other_user)
     participation = participation_factory(activity, user, status=Participation.Status.ACCEPTED)
-    scanned = resolver.post(
+
+    api_client.force_authenticate(user=other_user)
+    scanned = api_client.post(
         f'/activities/{activity.id}/attendance/scan',
         {'token': created_body['token']},
         format='json',
     )
     participation.refresh_from_db()
-    assert scanned.status_code == status.HTTP_204_NO_CONTENT
+    assert scanned.status_code == status.HTTP_200_OK
+    # успешный скан возвращает данные отсканированного юзера и новый статус
+    body = scanned.json()
+    assert body['user']['id'] == str(user.id)
+    assert body['status'] == Participation.Status.ATTENDED
     assert participation.status == Participation.Status.ATTENDED
     assert participation.attendance_marked_at is not None
 
+    # просроченный токен — скан отдаёт TOKEN_EXPIRED
     expired = qr_token_factory(
         user=user,
         token='qr:expired',
         expires_at=timezone.now() - timedelta(minutes=1),
     )
-    expired_response = resolver.post('/qr-tokens/resolve', {'token': expired.token}, format='json')
+    expired_response = api_client.post(
+        f'/activities/{activity.id}/attendance/scan',
+        {'token': expired.token},
+        format='json',
+    )
     assert expired_response.status_code == status.HTTP_400_BAD_REQUEST
+    assert expired_response.json()['error']['code'] == 'TOKEN_EXPIRED'
+
+
+def test_qr_scan_rejects_non_participant(
+    api_client, user, other_user, user_factory, activity_factory, qr_token_factory,
+):
+    """Сканирование юзера, который не записан на активность → NOT_PARTICIPANT."""
+    activity = activity_factory(organizer=other_user)
+    not_a_participant = user_factory()
+    token = qr_token_factory(user=not_a_participant)
+
+    api_client.force_authenticate(user=other_user)
+    response = api_client.post(
+        f'/activities/{activity.id}/attendance/scan',
+        {'token': token.token},
+        format='json',
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'NOT_PARTICIPANT'
+
+
+def test_qr_scan_rejects_already_attended(
+    api_client, user, other_user, activity_factory, participation_factory, qr_token_factory,
+):
+    """Повторное сканирование уже отмеченного юзера → ALREADY_ATTENDED."""
+    activity = activity_factory(organizer=other_user)
+    participation_factory(activity, user, status=Participation.Status.ATTENDED)
+    token = qr_token_factory(user=user)
+
+    api_client.force_authenticate(user=other_user)
+    response = api_client.post(
+        f'/activities/{activity.id}/attendance/scan',
+        {'token': token.token},
+        format='json',
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'ALREADY_ATTENDED'
+
+
+def test_qr_scan_rejects_organizer_themselves(
+    api_client, user, other_user, activity_factory, qr_token_factory,
+):
+    """
+    Если организатор сам себя сканирует (QR от своего же аккаунта) — IS_ORGANIZER.
+    Маловероятный, но защищаем от случая.
+    """
+    activity = activity_factory(organizer=other_user)
+    # QR-токен принадлежит самому организатору
+    token = qr_token_factory(user=other_user)
+
+    api_client.force_authenticate(user=other_user)
+    response = api_client.post(
+        f'/activities/{activity.id}/attendance/scan',
+        {'token': token.token},
+        format='json',
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()['error']['code'] == 'IS_ORGANIZER'
 
 
 def test_qr_scan_requires_organizer(auth_client, user, other_user, activity_factory, qr_token_factory):
@@ -599,20 +671,6 @@ def test_qr_scan_requires_organizer(auth_client, user, other_user, activity_fact
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_qr_resolve_rejects_used_token(api_client, user, other_user, qr_token_factory):
-    used = qr_token_factory(
-        user=user,
-        token='qr:used',
-        used_at=timezone.now(),
-    )
-    api_client.force_authenticate(user=other_user)
-
-    response = api_client.post('/qr-tokens/resolve', {'token': used.token}, format='json')
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()['error']['code'] == 'TOKEN_USED'
 
 
 def test_qr_scan_rejects_used_token(

@@ -160,10 +160,11 @@
           "show_birth_date": { "type": "boolean" }
         }
       },
-      "QrTokenResolveRequest": {
+      "QrScanRequest": {
         "type": "object",
+        "description": "Тело запроса POST /activities/{id}/attendance/scan",
         "properties": {
-          "token": { "type": "string" }
+          "token": { "type": "string", "description": "QR-токен участника, который генерируется через POST /me/qr-token" }
         },
         "required": ["token"]
       },
@@ -174,14 +175,6 @@
           "expires_at": { "type": "string", "format": "date-time" }
         },
         "required": ["token", "expires_at"]
-      },
-      "QrTokenResolveResponse": {
-        "type": "object",
-        "properties": {
-          "user": { "$ref": "#/components/schemas/UserSnippet" },
-          "expires_at": { "type": "string", "format": "date-time" }
-        },
-        "required": ["user", "expires_at"]
       },
       "ActivityLocation": {
         "type": "object",
@@ -870,30 +863,6 @@
         }
       }
     },
-    "/qr-tokens/resolve": {
-      "post": {
-        "tags": ["users"],
-        "summary": "Resolve QR token",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/QrTokenResolveRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Resolved token data",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/QrTokenResolveResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
     "/activities": {
       "get": {
         "tags": ["activities"],
@@ -1332,6 +1301,7 @@
       "post": {
         "tags": ["participation"],
         "summary": "Mark attendance via QR token",
+        "description": "Организатор сканирует QR участника и отмечает посещение. Возвращает данные отсканированного пользователя и его новый статус. Возможные ошибки: IS_ORGANIZER, NOT_PARTICIPANT, ALREADY_ATTENDED, INVALID_PARTICIPATION_STATE, INVALID_TOKEN, TOKEN_USED, TOKEN_EXPIRED.",
         "parameters": [
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
@@ -1339,12 +1309,29 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/QrTokenResolveRequest" }
+              "schema": { "$ref": "#/components/schemas/QrScanRequest" }
             }
           }
         },
         "responses": {
-          "204": { "description": "Success" }
+          "200": {
+            "description": "Attendance marked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": { "$ref": "#/components/schemas/UserSnippet" },
+                    "status": { "type": "string", "enum": ["attended"] }
+                  },
+                  "required": ["user", "status"]
+                }
+              }
+            }
+          },
+          "400": { "description": "IS_ORGANIZER / NOT_PARTICIPANT / ALREADY_ATTENDED / INVALID_PARTICIPATION_STATE / TOKEN_USED / TOKEN_EXPIRED" },
+          "403": { "description": "Caller is not the organizer of this activity" },
+          "404": { "description": "INVALID_TOKEN (qr token not found)" }
         }
       }
     },

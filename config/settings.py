@@ -172,7 +172,6 @@ REST_FRAMEWORK = {
         'register': '5/hour',
         'refresh': '20/min',
         'qr_issue': '30/min',
-        'qr_resolve': '30/min',
         'qr_scan': '60/min',
     },
 }

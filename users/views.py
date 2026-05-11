@@ -395,47 +395,6 @@ class QrTokenView(APIView):
         })
 
 
-class QrTokenResolveView(APIView):
-    """POST /qr-tokens/resolve — расшифровать QR-токен и получить данные пользователя."""
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'qr_resolve'
-
-    def post(self, request):
-        token_str = request.data.get('token')
-        if not token_str:
-            return Response(
-                {'error': {'code': 'BAD_REQUEST', 'message': 'token обязателен'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            qr_token = QrToken.objects.select_related('user').get(token=token_str)
-        except QrToken.DoesNotExist:
-            return Response(
-                {'error': {'code': 'INVALID_TOKEN', 'message': 'Токен не найден'}},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if qr_token.used_at is not None:
-            return Response(
-                {'error': {'code': 'TOKEN_USED', 'message': 'Токен уже использован'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if qr_token.is_expired:
-            return Response(
-                {'error': {'code': 'TOKEN_EXPIRED', 'message': 'Токен истёк'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        from .serializers import UserSnippetSerializer
-        return Response({
-            'user': UserSnippetSerializer(qr_token.user).data,
-            'expires_at': qr_token.expires_at,
-        })
-
-
 class QrAttendanceScanView(APIView):
     """POST /activities/:id/attendance/scan — отметить посещение через QR."""
     permission_classes = [IsAuthenticated]
@@ -482,12 +441,40 @@ class QrAttendanceScanView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        participation = get_object_or_404(
-            Participation,
-            activity=activity,
-            user=qr_token.user,
-            status=Participation.Status.ACCEPTED,
-        )
+        # явные ошибки для трёх сценариев вместо общего 404 —
+        # фронт сможет показать понятное сообщение организатору
+
+        # 1) сканируется сам организатор активности
+        if qr_token.user_id == activity.organizer_id:
+            return Response(
+                {'error': {'code': 'IS_ORGANIZER', 'message': 'Это организатор активности, его отмечать не нужно'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            participation = Participation.objects.get(activity=activity, user=qr_token.user)
+        except Participation.DoesNotExist:
+            # 2) пользователь вообще не записан на эту активность
+            return Response(
+                {'error': {'code': 'NOT_PARTICIPANT', 'message': 'Этот пользователь не записан на активность'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3) пользователя уже отсканировали ранее
+        if participation.status == Participation.Status.ATTENDED:
+            return Response(
+                {'error': {'code': 'ALREADY_ATTENDED', 'message': 'Этот пользователь уже отмечен как посетивший'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if participation.status != Participation.Status.ACCEPTED:
+            return Response(
+                {'error': {
+                    'code': 'INVALID_PARTICIPATION_STATE',
+                    'message': f'Нельзя отметить участие: текущий статус «{participation.status}»',
+                }},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         participation.status = Participation.Status.ATTENDED
         participation.attendance_marked_at = timezone.now()
@@ -497,7 +484,13 @@ class QrAttendanceScanView(APIView):
         qr_token.used_at = timezone.now()
         qr_token.save()
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        # возвращаем имя отсканированного пользователя и новый статус —
+        # фронт может показать «✅ {имя} отмечен» вместо «успешно»
+        from .serializers import UserSnippetSerializer
+        return Response({
+            'user': UserSnippetSerializer(qr_token.user).data,
+            'status': participation.status,
+        })
 
 
 class MyActivitiesView(APIView):

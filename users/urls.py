@@ -3,7 +3,7 @@ from .views import (
     RegisterView, LoginView, MeView,
     MyActivitiesView, UserDetailView, UserHistoryView,
     UserRatingView, UserAttendanceHistoryView,
-    QrTokenView, QrTokenResolveView, QrAttendanceScanView,
+    QrTokenView, QrAttendanceScanView,
     LogoutView, RefreshTokenView,
 )
 
@@ -19,6 +19,5 @@ urlpatterns = [
     path('users/<int:user_id>/history', UserHistoryView.as_view()),
     path('users/<int:user_id>/rating', UserRatingView.as_view()),
     path('users/<int:user_id>/attendance-history', UserAttendanceHistoryView.as_view()),
-    path('qr-tokens/resolve', QrTokenResolveView.as_view()),
     path('activities/<int:activity_id>/attendance/scan', QrAttendanceScanView.as_view()),
 ]

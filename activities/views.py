@@ -198,11 +198,15 @@ class ActivityDeclineOrganizershipView(APIView):
     """POST /activities/:id/decline-organizership — отказаться от роли организатора.
 
     Передаёт активность следующему по очереди участнику, либо отменяет
-    если участников больше нет. Текущий организатор после отказа выбывает.
+    если участников больше нет. Бывший организатор остаётся в активности
+    как обычный участник (accepted) — если не хочет, может выйти отдельным
+    запросом `DELETE /activities/<id>/participants/me`.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, activity_id):
+        from participation.models import Participation
+
         activity = get_object_or_404(Activity, id=activity_id)
 
         if activity.organizer_id != request.user.id:
@@ -216,7 +220,18 @@ class ActivityDeclineOrganizershipView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        transfer_organizership_or_cancel(activity)
+        prev_organizer = request.user
+        result = transfer_organizership_or_cancel(activity)
+
+        # если передали другому — оставляем бывшего организатора в активности
+        # как обычного участника, чтобы он мог продолжить ходить как все
+        if result == 'transferred':
+            Participation.objects.get_or_create(
+                activity=activity,
+                user=prev_organizer,
+                defaults={'status': Participation.Status.ACCEPTED},
+            )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
