@@ -6,7 +6,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser
 from django.shortcuts import get_object_or_404
 from django.conf import settings
@@ -126,6 +126,8 @@ class FileUploadView(APIView):
 
 
 class FileDetailView(APIView):
+    permission_classes = [AllowAny]
+    renderer_classes = []
 
     def get(self, request, file_id):
         file = get_object_or_404(File, id=file_id)
