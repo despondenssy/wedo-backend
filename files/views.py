@@ -127,7 +127,6 @@ class FileUploadView(APIView):
 
 class FileDetailView(APIView):
     permission_classes = [AllowAny]
-    renderer_classes = []
 
     def get(self, request, file_id):
         file = get_object_or_404(File, id=file_id)

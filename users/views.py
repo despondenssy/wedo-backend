@@ -453,7 +453,7 @@ class QrAttendanceScanView(APIView):
 
         activity = get_object_or_404(Activity, id=activity_id)
 
-        if activity.organizer != request.user:
+        if activity.organizer_id != request.user.id: #подгружаем только id юзера
             return Response(
                 {'error': {'code': 'FORBIDDEN', 'message': 'Только организатор может сканировать QR'}},
                 status=status.HTTP_403_FORBIDDEN,
