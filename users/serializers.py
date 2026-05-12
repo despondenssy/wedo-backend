@@ -209,6 +209,4 @@ class UserSnippetSerializer(serializers.ModelSerializer):
         return str(obj.avatar_file_id) if obj.avatar_file_id else None
 
     def get_is_deleted(self, obj):
-        # фронт по этому полю узнаёт что профиль не открыть, и может
-        # отрисовать имя серым / отключить переход на страницу пользователя
         return obj.deleted_at is not None

@@ -152,6 +152,9 @@ class UserHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
+        return self._handle(request, user_id, apply_filters=False)
+
+    def _handle(self, request, user_id, *, apply_filters):
         user = get_object_or_404(User, id=user_id, deleted_at__isnull=True)
         tab = request.query_params.get('tab', 'created')
         limit = min(int(request.query_params.get('limit', 20)), 50)
@@ -169,10 +172,10 @@ class UserHistoryView(APIView):
         )
 
         # для табов organizer/participant/ratings/all отдаём ленту событий
-        # (organized/joined/attended/missed/rated/cancelled), а не список активностей
+        # (organized/joined/attended/missed/rated/cancelled)
         EVENT_TABS = ('organizer', 'participant', 'ratings', 'all')
         if tab in EVENT_TABS:
-            return self._events_response(request, user, tab, limit, cursor)
+            return self._events_response(request, user, tab, limit, cursor, apply_filters=apply_filters)
 
         if tab == 'created':
             queryset = Activity.objects.filter(
@@ -181,8 +184,7 @@ class UserHistoryView(APIView):
 
         elif tab == 'future_created':
             # активности, которые пользователь организует и которые ещё актуальны
-            # (используется на экране QR-сканирования организатора —
-            # ему не нужны прошедшие или отменённые)
+            # (используется на экране QR-сканирования организатора)
             queryset = Activity.objects.filter(
                 organizer=user,
                 status=Activity.Status.ACTIVE,
@@ -223,17 +225,15 @@ class UserHistoryView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # применяем стандартный набор фильтров (q, category_id, format, date_*,
-        # city_*, time_zone_offset_* и пр.) — те же что и на /activities.
-        # Город из профиля юзера auto-fill'ом НЕ подставляем — здесь смотрят
-        # свою историю, а не «события рядом со мной».
-        from activities.views import apply_activity_filters
-        queryset = apply_activity_filters(
-            queryset, request,
-            effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
-            effective_city_region=request.query_params.get('city_region'),
-            effective_city_country=request.query_params.get('city_country'),
-        )
+        # фильтры применяются только на /me/my-activities (apply_filters=True).
+        if apply_filters:
+            from activities.views import apply_activity_filters
+            queryset = apply_activity_filters(
+                queryset, request,
+                effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
+                effective_city_region=request.query_params.get('city_region'),
+                effective_city_country=request.query_params.get('city_country'),
+            )
 
         if cursor:
             queryset = queryset.filter(id__lt=cursor)
@@ -252,7 +252,7 @@ class UserHistoryView(APIView):
             'has_more': has_more,
         })
 
-    def _events_response(self, request, user, tab, limit, cursor):
+    def _events_response(self, request, user, tab, limit, cursor, *, apply_filters):
         """
         Возвращает ленту событий пользователя (organized/cancelled/joined/
         attended/missed/rated). События синтезируются на лету из таблиц
@@ -271,7 +271,6 @@ class UserHistoryView(APIView):
         from activities.views import _aggregate_participations, apply_activity_filters
 
         # 1) собираем сырые "взаимодействия" пользователя с активностями.
-        #    На этом шаге фильтры по полям активности ещё не применяются.
         _PARTICIPATED = (
             Participation.Status.ACCEPTED,
             Participation.Status.ATTENDED,
@@ -306,17 +305,17 @@ class UserHistoryView(APIView):
         if not relevant_activity_ids:
             return Response({'items': [], 'next_cursor': None, 'has_more': False})
 
-        # 2) применяем стандартные фильтры к набору этих активностей.
-        #    Активности, не прошедшие фильтр, не дадут ни одного события.
+        # 2) применяем фильтры — только если вызвали через /me/my-activities.
         filtered_qs = Activity.objects.filter(
             id__in=relevant_activity_ids,
         ).select_related('organizer')
-        filtered_qs = apply_activity_filters(
-            filtered_qs, request,
-            effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
-            effective_city_region=request.query_params.get('city_region'),
-            effective_city_country=request.query_params.get('city_country'),
-        )
+        if apply_filters:
+            filtered_qs = apply_activity_filters(
+                filtered_qs, request,
+                effective_city_settlement=request.query_params.get('city_settlement') or request.query_params.get('city'),
+                effective_city_region=request.query_params.get('city_region'),
+                effective_city_country=request.query_params.get('city_country'),
+            )
         activities_by_id = {a.id: a for a in filtered_qs}
 
         # 3) синтезируем события только из отфильтрованных активностей
@@ -487,8 +486,7 @@ class QrAttendanceScanView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # явные ошибки для трёх сценариев вместо общего 404 —
-        # фронт сможет показать понятное сообщение организатору
+        # явные ошибки для трёх сценариев вместо общего 404
 
         # 1) сканируется сам организатор активности
         if qr_token.user_id == activity.organizer_id:
@@ -530,8 +528,7 @@ class QrAttendanceScanView(APIView):
         qr_token.used_at = timezone.now()
         qr_token.save()
 
-        # возвращаем имя отсканированного пользователя и новый статус —
-        # фронт может показать «✅ {имя} отмечен» вместо «успешно»
+        # возвращаем имя отсканированного пользователя и новый статус
         from .serializers import UserSnippetSerializer
         return Response({
             'user': UserSnippetSerializer(qr_token.user).data,
@@ -540,11 +537,17 @@ class QrAttendanceScanView(APIView):
 
 
 class MyActivitiesView(APIView):
-    """GET /me/my-activities — мои активности."""
+    """GET /me/my-activities — мои активности с поддержкой фильтров.
+
+    Делегирует UserHistoryView, но включает фильтры (q, category_id, format,
+    date_*, city_*, и т.д.).
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return UserHistoryView().get(request, user_id=request.user.id)
+        return UserHistoryView()._handle(
+            request, user_id=request.user.id, apply_filters=True,
+        )
 
 
 class UserRatingView(APIView):
