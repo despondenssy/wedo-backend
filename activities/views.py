@@ -1,6 +1,4 @@
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -59,46 +57,6 @@ def _aggregate_participations(activity_ids):
             pending_count[activity_id] += 1
 
     return real_count, pending_count, total_count, participant_ids
-
-
-# Фиксированные offset'ы для дробных таймзон (в минутах).
-# Эти IANA-зоны выбраны на фронте как представители offset'ов и не имеют DST.
-_FIXED_TZ_OFFSETS_MINUTES = {
-    "Pacific/Marquesas": -570,
-    "America/St_Johns": -210,
-    "Asia/Kabul": 270,
-    "Asia/Kolkata": 330,
-    "Asia/Kathmandu": 345,
-    "Asia/Yangon": 390,
-    "Australia/Eucla": 525,
-    "Australia/Darwin": 570,
-    "Australia/Lord_Howe": 630,
-    "Pacific/Chatham": 765,
-}
-
-
-def get_timezone_offset_hours(dt: datetime, tz_name: str) -> float:
-    """
-    Возвращает UTC-offset в часах для указанной даты и IANA-таймзоны.
-
-    Для дробных таймзон (Pacific/Marquesas и т.д.) использует фиксированную мапу.
-    Для целых (Etc/GMT, Europe/Moscow и т.д.) вычисляет через ZoneInfo
-    с учётом DST на указанную дату.
-    """
-    if tz_name in _FIXED_TZ_OFFSETS_MINUTES:
-        return _FIXED_TZ_OFFSETS_MINUTES[tz_name] / 60
-
-    try:
-        tz = ZoneInfo(tz_name) #делает из IANA объект, который знает offset для каждой конкретной даты
-        local_dt = dt.astimezone(tz) #переводит дату из UTC в локальное время
-        offset = local_dt.utcoffset() #считаем offset на эту дату
-        if offset is None:
-            logger.warning("UTC offset is None for %s at %s", tz_name, dt)
-            return None
-        return offset.total_seconds() / 3600
-    except (ZoneInfoNotFoundError, OSError):
-        logger.warning("Unknown or invalid timezone: %s", tz_name)
-        return None
 
 
 def _decode_cursor(cursor):
@@ -269,8 +227,6 @@ def apply_activity_filters(
     only_available = request.query_params.get('only_available')
     price_to = request.query_params.get('price_to')
     max_participants = request.query_params.get('max_participants')
-    timezone_offset_from = request.query_params.get('time_zone_offset_from')
-    timezone_offset_to = request.query_params.get('time_zone_offset_to')
 
     # текстовый поиск
     if q:
@@ -331,23 +287,6 @@ def apply_activity_filters(
             or real_count.get(c['id'], 0) < c['pref_max_participants']
         ]
         queryset = queryset.filter(id__in=available_ids)
-
-    # in-memory фильтр по часовому поясу — только для online,
-    # т.к. offset зависит от start_at и time_zone (с учётом DST)
-    if format_ == 'online' and (timezone_offset_from is not None or timezone_offset_to is not None):
-        min_offset = float(timezone_offset_from) if timezone_offset_from else float('-inf')
-        max_offset = float(timezone_offset_to) if timezone_offset_to else float('inf')
-
-        all_filtered = list(queryset.values('id', 'start_at', 'time_zone'))
-        matching_ids = []
-        for item in all_filtered:
-            offset = get_timezone_offset_hours(item['start_at'], item['time_zone'])
-            if offset is None:
-                continue
-            if min_offset <= offset <= max_offset:
-                matching_ids.append(item['id'])
-
-        queryset = queryset.filter(id__in=matching_ids)
 
     return queryset
 

@@ -317,39 +317,6 @@ def test_activity_list_max_participants(auth_client, activity_factory):
     assert str(large.id) not in ids
 
 
-def test_activity_list_timezone_offset_filter(auth_client, activity_factory):
-    """time_zone_offset_from/to фильтрует online-активности по часовому поясу."""
-    # online-активности в разных таймзонах
-    moscow = activity_factory(
-        format='online',
-        time_zone='Europe/Moscow',
-        start_at=timezone.now(),
-    )
-    london = activity_factory(
-        format='online',
-        time_zone='Europe/London',
-        start_at=timezone.now(),
-    )
-    ny = activity_factory(
-        format='online',
-        time_zone='America/New_York',
-        start_at=timezone.now(),
-    )
-
-    # offline-активность не должна фильтроваться по timezone
-    offline = activity_factory(format='offline', time_zone='Europe/Moscow')
-
-    # Фильтр применяется только при format=online в query-параметрах
-    # time_zone_offset_from=2 — Moscow (UTC+3) подходит, London (UTC+1) и NY (UTC-4) — нет
-    resp = auth_client.get('/activities?format=online&time_zone_offset_from=2')
-    assert resp.status_code == status.HTTP_200_OK
-    ids = [item['id'] for item in resp.json()['items']]
-    assert str(moscow.id) in ids
-    assert str(london.id) not in ids  # London = UTC+1, 1 < 2
-    assert str(ny.id) not in ids  # NY = UTC-4, -4 < 2
-    assert str(offline.id) not in ids  # offline не online
-
-
 def test_activity_list_cursor_pagination_with_sort(auth_client, activity_factory):
     """cursor-пагинация работает с нестандартной сортировкой."""
     a1 = activity_factory(price=100)
@@ -372,52 +339,6 @@ def test_activity_list_cursor_pagination_with_sort(auth_client, activity_factory
     body2 = resp2.json()
     assert len(body2['items']) == 1
     assert body2['items'][0]['id'] == str(a1.id)  # price=100
-
-
-def test_activity_list_timezone_offset_dst_handling(auth_client, activity_factory):
-    """Проверка, что offset считается на дату start_at, а не текущую."""
-    from datetime import timezone as tz_module
-
-    # активность в London зимой (UTC+0)
-    winter = activity_factory(
-        format='online',
-        time_zone='Europe/London',
-        start_at=datetime(2024, 1, 15, 12, 0, tzinfo=tz_module.utc),
-    )
-    # активность в London летом (UTC+1)
-    summer = activity_factory(
-        format='online',
-        time_zone='Europe/London',
-        start_at=datetime(2024, 6, 15, 12, 0, tzinfo=tz_module.utc),
-    )
-
-    # фильтр time_zone_offset_from=1 — должна найтись только летняя
-    resp = auth_client.get('/activities?format=online&time_zone_offset_from=1')
-    assert resp.status_code == status.HTTP_200_OK
-    ids = [item['id'] for item in resp.json()['items']]
-    assert str(summer.id) in ids
-    assert str(winter.id) not in ids
-
-
-def test_activity_list_timezone_offset_fractional(auth_client, activity_factory):
-    """Проверка фильтрации по дробным offset'ам (Asia/Kolkata = UTC+5:30)."""
-    kolkata = activity_factory(
-        format='online',
-        time_zone='Asia/Kolkata',
-        start_at=timezone.now(),
-    )
-    moscow = activity_factory(
-        format='online',
-        time_zone='Europe/Moscow',
-        start_at=timezone.now(),
-    )
-
-    # time_zone_offset_from=5&time_zone_offset_to=6 — только Kolkata (5.5)
-    resp = auth_client.get('/activities?format=online&time_zone_offset_from=5&time_zone_offset_to=6')
-    assert resp.status_code == status.HTTP_200_OK
-    ids = [item['id'] for item in resp.json()['items']]
-    assert str(kolkata.id) in ids
-    assert str(moscow.id) not in ids
 
 
 def test_activity_create_persists_payload(auth_client, user, activity_payload):
