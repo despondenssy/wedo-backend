@@ -351,8 +351,9 @@ def test_user_history_future_created_tab(
 ):
     """
     Таб future_created — для экрана QR-сканирования организатора.
-    Возвращает только активные и ещё не начавшиеся активности юзера.
-    Прошедшие, отменённые и активности других — не должны попадать.
+    Возвращает активные активности юзера, которые ещё не закончились
+    (end_at >= now). Прошедшие, отменённые и активности других —
+    не должны попадать.
     """
     from datetime import timedelta
     from django.utils import timezone
@@ -362,6 +363,12 @@ def test_user_history_future_created_tab(
         organizer=user,
         start_at=now + timedelta(days=1),
         end_at=now + timedelta(days=1, hours=2),
+    )
+    # активность идёт прямо сейчас — должна попадать в ответ
+    ongoing = activity_factory(
+        organizer=user,
+        start_at=now - timedelta(hours=1),
+        end_at=now + timedelta(hours=1),
     )
     past = activity_factory(
         organizer=user,
@@ -381,6 +388,7 @@ def test_user_history_future_created_tab(
     ids = [item['id'] for item in response.json()['items']]
 
     assert str(future_active.id) in ids
+    assert str(ongoing.id) in ids       # текущая активность тоже должна быть
     assert str(past.id) not in ids
     assert str(cancelled.id) not in ids
     assert str(other_user_activity.id) not in ids

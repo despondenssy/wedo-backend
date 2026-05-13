@@ -188,7 +188,7 @@ class UserHistoryView(APIView):
             queryset = Activity.objects.filter(
                 organizer=user,
                 status=Activity.Status.ACTIVE,
-                start_at__gte=timezone.now(),
+                end_at__gte=timezone.now(),
             ).select_related('organizer')
 
         elif tab == 'upcoming':
@@ -199,7 +199,7 @@ class UserHistoryView(APIView):
             ).values_list('activity_id', flat=True)
             queryset = Activity.objects.filter(
                 id__in=activity_ids,
-                start_at__gte=timezone.now(),
+                end_at__gte=timezone.now(),
                 status=Activity.Status.ACTIVE,
             ).select_related('organizer')
 
