@@ -161,7 +161,7 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     assert user.deleted_at is not None
     # персональные данные анонимизированы — реальное имя и email
     # не остаются в системе после удаления аккаунта
-    assert user.name == 'Удалённый пользователь'
+    assert user.name == 'Удалённый аккаунт'
     assert user.email == f'deleted-{user.id}@deleted.local'
     assert user.city_settlement is None
     assert user.interests == []

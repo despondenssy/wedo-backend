@@ -63,7 +63,7 @@
           "name": { "type": "string" },
           "avatar_file_id": { "type": "string", "nullable": true },
           "rating": { "type": "number" },
-          "is_deleted": { "type": "boolean", "description": "true если аккаунт пользователя удалён (name заменён на «Удалённый пользователь», переход на профиль возвращает 404)" }
+          "is_deleted": { "type": "boolean", "description": "true если аккаунт пользователя удалён (name заменён на «Удалённый аккаунт», переход на профиль возвращает 404)" }
         },
         "required": ["id", "name", "rating", "is_deleted"]
       },

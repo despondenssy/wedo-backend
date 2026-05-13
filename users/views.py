@@ -121,10 +121,10 @@ class MeView(APIView):
         # 2) анонимизируем персональные данные юзера. Прошлые активности и
         #    оставленные участия не трогаем — у других пользователей сохраняется
         #    история «с кем посещал», а имя удалённого отображается как
-        #    «Удалённый пользователь» через UserSnippetSerializer.is_deleted.
+        #    «Удалённый аккаунт через UserSnippetSerializer.is_deleted.
         user.deleted_at = now
         user.is_active = False
-        user.name = 'Удалённый пользователь'
+        user.name = 'Удалённый аккаунт'
         user.email = f'deleted-{user.id}@deleted.local'
         user.avatar_file = None
         user.city_settlement = None
