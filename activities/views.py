@@ -1,8 +1,11 @@
 import logging
+from datetime import UTC, date, datetime, time, timedelta
+
 
 logger = logging.getLogger(__name__)
 
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -22,6 +25,7 @@ from .serializers import (
 
 # статусы участия, которые считаются "активными"
 _ACTIVE_PARTICIPATION_STATUSES = ('pending', 'accepted', 'attended')
+MAX_START_AT_WINDOWS = 93
 
 
 def _aggregate_participations(activity_ids):
@@ -57,6 +61,69 @@ def _aggregate_participations(activity_ids):
             pending_count[activity_id] += 1
 
     return real_count, pending_count, total_count, participant_ids
+
+
+def _parse_filter_date(value, field_name):
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field_name} must use YYYY-MM-DD format')
+
+
+def _parse_filter_time(value, field_name):
+    if not value:
+        return None
+    try:
+        return time.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field_name} must use HH:MM format')
+
+
+def _apply_start_at_window_filters(queryset, *, date_from, date_to, time_from, time_to):
+    """
+    Applies UTC schedule filters as connected datetime windows.
+
+    The frontend sends date_from/date_to/time_from/time_to already normalized to UTC.
+    These values are not independent date/time filters. For each UTC date in the
+    range we build a concrete start_at interval and OR the intervals together.
+    """
+    has_date_filter = bool(date_from or date_to)
+    has_time_filter = bool(time_from or time_to)
+    if not has_date_filter and not has_time_filter:
+        return queryset
+
+    start_date = _parse_filter_date(date_from, 'date_from')
+    end_date = _parse_filter_date(date_to, 'date_to')
+    start_time = _parse_filter_time(time_from, 'time_from') or time(0, 0)
+    end_time = _parse_filter_time(time_to, 'time_to') or time(0, 0)
+
+    if start_date is None and end_date is None:
+        start_date = timezone.now().date()
+        end_date = start_date + timedelta(days=MAX_START_AT_WINDOWS - 1)
+    elif start_date is None:
+        start_date = end_date
+    elif end_date is None:
+        end_date = start_date
+
+    if end_date < start_date:
+        raise ValueError('date_to must be greater than or equal to date_from')
+
+    days_count = (end_date - start_date).days + 1
+    if days_count > MAX_START_AT_WINDOWS:
+        raise ValueError(f'date range must not exceed {MAX_START_AT_WINDOWS} days')
+
+    windows_query = Q()
+    for day_offset in range(days_count):
+        current_date = start_date + timedelta(days=day_offset)
+        window_start = datetime.combine(current_date, start_time, tzinfo=UTC)
+        window_end = datetime.combine(current_date, end_time, tzinfo=UTC)
+        if window_end <= window_start:
+            window_end += timedelta(days=1)
+        windows_query |= Q(start_at__gte=window_start, start_at__lt=window_end)
+
+    return queryset.filter(windows_query)
 
 
 def _decode_cursor(cursor):
@@ -208,8 +275,8 @@ def apply_activity_filters(
     Если вызывающему нужен auto-fill города из user.city — пусть передаст
     через effective_city_*.
 
-    Используется на разных списочных endpoint'ах (`/activities`, `/me/my-activities`,
-    `/users/<id>/history`), чтобы фильтры применялись консистентно.
+    Используется на разных списочных endpoint'ах (`/activities`, `/me/my-activities`)
+    , чтобы фильтры применялись консистентно.
     """
     q = request.query_params.get('q')
     category_id = request.query_params.get('category_id')
@@ -253,14 +320,19 @@ def apply_activity_filters(
     if effective_city_country:
         queryset = queryset.filter(location_country__icontains=effective_city_country)
 
-    if date_from:
-        queryset = queryset.filter(start_at__date__gte=date_from)
-    if date_to:
-        queryset = queryset.filter(start_at__date__lte=date_to)
-    if time_from:
-        queryset = queryset.filter(start_at__time__gte=time_from)
-    if time_to:
-        queryset = queryset.filter(start_at__time__lte=time_to)
+    try:
+        queryset = _apply_start_at_window_filters(
+            queryset,
+            date_from=date_from,
+            date_to=date_to,
+            time_from=time_from,
+            time_to=time_to,
+        )
+    except ValueError as error:
+        raise ValidationError(
+            {'code': 'BAD_REQUEST', 'message': str(error)},
+        )
+
     if level:
         queryset = queryset.filter(pref_level=level)
     if gender:

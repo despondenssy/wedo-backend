@@ -723,7 +723,27 @@
         "parameters": [
           { "name": "tab", "in": "query", "schema": { "type": "string", "enum": ["created", "future_created", "upcoming", "attended", "organizer", "participant", "ratings", "all"] } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string", "description": "Для event-табов — ISO8601 timestamp; для обычных — id." } }
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "description": "Для event-табов — ISO8601 timestamp; для обычных — id." } },
+          { "name": "q", "in": "query", "schema": { "type": "string", "description": "Text search: substring (case-insensitive) in title, description, category_id and subcategory_id" } },
+          { "name": "category_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "subcategory_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["online", "offline"] } },
+          { "name": "city", "in": "query", "schema": { "type": "string" } },
+          { "name": "city_settlement", "in": "query", "schema": { "type": "string" } },
+          { "name": "city_region", "in": "query", "schema": { "type": "string" } },
+          { "name": "city_country", "in": "query", "schema": { "type": "string" } },
+          { "name": "date_from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "date_to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "time_from", "in": "query", "schema": { "type": "string" } },
+          { "name": "time_to", "in": "query", "schema": { "type": "string" } },
+          { "name": "level", "in": "query", "schema": { "type": "string" } },
+          { "name": "gender", "in": "query", "schema": { "type": "string" } },
+          { "name": "age_from", "in": "query", "schema": { "type": "integer" } },
+          { "name": "age_to", "in": "query", "schema": { "type": "integer" } },
+          { "name": "requires_approval", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "only_available", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "price_to", "in": "query", "schema": { "type": "number" } },
+          { "name": "max_participants", "in": "query", "schema": { "type": "integer" } }
         ],
         "responses": {
           "200": {
@@ -736,6 +756,14 @@
                     { "$ref": "#/components/schemas/HistoryEventResponse" }
                   ]
                 }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — invalid filter parameters",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
@@ -899,6 +927,14 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ActivityListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — invalid filter parameters",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }

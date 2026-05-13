@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import UTC, timedelta, datetime
 
 import pytest
 from django.utils import timezone
@@ -280,6 +280,28 @@ def test_activity_list_time_filters(auth_client, activity_factory):
     assert str(morning.id) not in ids
     assert str(afternoon.id) in ids
     assert str(evening.id) not in ids
+
+
+def test_activity_list_time_filters_build_connected_utc_windows(auth_client, activity_factory):
+    """date_from/date_to/time_from/time_to are connected UTC datetime windows."""
+    false_positive = activity_factory(
+        start_at=datetime(2026, 5, 19, 15, 0, tzinfo=UTC),
+        time_zone='Europe/Moscow',
+    )
+    matching = activity_factory(
+        start_at=datetime(2026, 5, 19, 22, 0, tzinfo=UTC),
+        time_zone='Europe/Moscow',
+    )
+
+    resp = auth_client.get(
+        '/activities?date_from=2026-05-19&date_to=2026-05-24'
+        '&time_from=21:30&time_to=20:30'
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    ids = [item['id'] for item in resp.json()['items']]
+    assert str(false_positive.id) not in ids
+    assert str(matching.id) in ids
 
 
 def test_activity_list_only_available(auth_client, activity_factory, participation_factory, user):
