@@ -79,6 +79,7 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
+          "birth_date": { "type": "string", "format": "date", "nullable": true, "description": "Дата рождения. Возвращается только для владельца аккаунта, для остальных — null" },
           "avatar_file_id": { "type": "string", "nullable": true },
           "rating": { "type": "number" },
           "age": { "type": "integer", "nullable": true },

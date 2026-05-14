@@ -8,7 +8,7 @@ User = get_user_model()
 
 class CitySerializer(serializers.Serializer):
     settlement = serializers.CharField()
-    region = serializers.CharField()
+    region = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     country = serializers.CharField()
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
@@ -43,7 +43,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         user = User(
             city_settlement=city_data['settlement'],
-            city_region=city_data['region'],
+            city_region=city_data.get('region'),
             city_country=city_data['country'],
             city_latitude=city_data['latitude'],
             city_longitude=city_data['longitude'],
@@ -81,7 +81,7 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
         if city_data:
             instance.city_settlement = city_data['settlement']
-            instance.city_region = city_data['region']
+            instance.city_region = city_data.get('region')
             instance.city_country = city_data['country']
             instance.city_latitude = city_data['latitude']
             instance.city_longitude = city_data['longitude']
@@ -103,6 +103,7 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     id = serializers.CharField()
+    birth_date = serializers.SerializerMethodField()
     avatar_file_id = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
     attendance_history = serializers.SerializerMethodField()
@@ -116,7 +117,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'avatar_file_id', 'rating', 'age', 'gender', 'show_birth_date',
+            'id', 'name', 'birth_date', 'avatar_file_id', 'rating', 'age', 'gender', 'show_birth_date',
             'city', 'interests', 'attendance_history',
             'reviews_preview', 'is_current_user', 'is_subscribed',
         ]
@@ -132,6 +133,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_avatar_file_id(self, obj):
         return str(obj.avatar_file_id) if obj.avatar_file_id else None
+
+    def get_birth_date(self, obj):
+        if self._is_current_user(obj):
+            return obj.birth_date.isoformat()
+        return None
 
     def get_age(self, obj):
         if self._is_current_user(obj) or obj.show_birth_date:

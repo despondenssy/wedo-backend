@@ -110,6 +110,41 @@ def test_register_rejects_common_password(api_client):
     assert 'password' in response.json()
 
 
+def test_register_without_city_region(api_client):
+    """Регистрация должна проходить без поля region в city (кейс Москвы/Питера)."""
+    payload = register_payload()
+    payload['city'].pop('region')
+
+    response = api_client.post('/auth/register', payload, format='json')
+
+    assert response.status_code == status.HTTP_201_CREATED
+    body = response.json()
+    assert body['user']['city']['region'] is None
+
+
+def test_me_returns_birth_date_for_owner(auth_client, user):
+    """GET /me должен возвращать birth_date для владельца аккаунта."""
+    response = auth_client.get('/me')
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body['is_current_user'] is True
+    assert 'birth_date' in body
+    assert body['birth_date'] is not None
+
+
+def test_user_profile_hides_birth_date_for_others(api_client, user, other_user):
+    """GET /users/{id} не должен возвращать birth_date для чужих профилей."""
+    api_client.force_authenticate(user=other_user)
+    response = api_client.get(f'/users/{user.id}')
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body['is_current_user'] is False
+    assert 'birth_date' in body
+    assert body['birth_date'] is None
+
+
 def test_login_and_refresh_reject_invalid_data(api_client, user):
     bad_login = api_client.post(
         '/auth/login',
