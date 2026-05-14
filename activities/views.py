@@ -244,6 +244,11 @@ class ActivityDeclineOrganizershipView(APIView):
                 {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже отменена или завершена'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if activity.start_at <= timezone.now():
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Нельзя отказаться от организаторства после начала активности'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         prev_organizer = request.user
         result = transfer_organizership_or_cancel(activity)
@@ -484,7 +489,7 @@ class ActivityListView(APIView):
         notify_followers_of_new_activity.delay(activity.id)
 
         return Response(
-            ActivityDetailSerializer(activity).data,
+            ActivityDetailSerializer(activity, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -502,11 +507,21 @@ class ActivityDetailView(APIView):
     def patch(self, request, activity_id):
         activity = get_object_or_404(Activity, id=activity_id)
 
-        # только организатор может редактировать
+        # только организатор может редактировать, и только пока активность не началась
         if activity.organizer != request.user:
             return Response(
                 {'error': {'code': 'FORBIDDEN', 'message': 'Нет прав для редактирования'}},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+        if activity.status != Activity.Status.ACTIVE:
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Нельзя редактировать отменённую активность'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if activity.start_at <= timezone.now():
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Нельзя редактировать активность после начала'}},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         serializer = UpdateActivitySerializer(activity, data=request.data, partial=True)
@@ -538,8 +553,17 @@ class ActivityCancelView(APIView):
                 {'error': {'code': 'FORBIDDEN', 'message': 'Нет прав для отмены'}},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if activity.status != Activity.Status.ACTIVE:
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже отменена'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if activity.start_at <= timezone.now():
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Нельзя отменить активность после начала'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        from django.utils import timezone
         activity.status = Activity.Status.CANCELLED
         activity.cancelled_at = timezone.now()
         activity.save()

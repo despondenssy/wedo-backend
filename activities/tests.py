@@ -387,3 +387,162 @@ def test_activity_list_invalid_cursor_returns_400(auth_client, activity_factory)
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
+def test_policy_flags_for_organizer_before_start(auth_client, user, activity_factory):
+    """Организатор до начала активности: can_edit=True, can_cancel_activity=True."""
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_edit'] is True
+    assert flags['can_cancel_activity'] is True
+    assert flags['can_join'] is False
+    assert flags['can_leave'] is False
+    assert flags['can_cancel_request'] is False
+    assert flags['can_manage_requests'] is True
+    assert flags['can_rate'] is False
+
+
+def test_policy_flags_for_organizer_after_start(auth_client, user, activity_factory):
+    """Организатор после начала активности: can_edit=False, can_cancel_activity=False."""
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() - timedelta(hours=1),
+        end_at=timezone.now() + timedelta(hours=1),
+    )
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_edit'] is False
+    assert flags['can_cancel_activity'] is False
+    assert flags['can_manage_requests'] is True  # ещё не закончилась
+    assert flags['can_join'] is False
+
+
+def test_policy_flags_for_organizer_after_end(auth_client, user, activity_factory):
+    """Организатор после окончания активности: все флаги False."""
+    activity = activity_factory(
+        organizer=user,
+        start_at=timezone.now() - timedelta(hours=3),
+        end_at=timezone.now() - timedelta(hours=1),
+    )
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert all(not v for v in flags.values()), f'Expected all False, got {flags}'
+
+
+def test_policy_flags_for_participant_accepted(auth_client, user, activity_factory, participation_factory):
+    """Участник (accepted) до окончания: can_leave=True, can_join=False."""
+    activity = activity_factory(
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    participation_factory(activity, user, status='accepted')
+
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_leave'] is True
+    assert flags['can_join'] is False
+    assert flags['can_cancel_request'] is False
+    assert flags['can_rate'] is False
+
+
+def test_policy_flags_for_participant_attended_without_rating(
+    auth_client, user, activity_factory, participation_factory,
+):
+    """Участник (attended) без оценки: can_rate=True."""
+    activity = activity_factory(
+        start_at=timezone.now() - timedelta(hours=3),
+        end_at=timezone.now() - timedelta(hours=1),
+    )
+    participation_factory(activity, user, status='attended')
+
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_rate'] is True
+    assert flags['can_leave'] is False  # attended не может выйти
+
+
+def test_policy_flags_for_participant_attended_with_rating(
+    auth_client, user, activity_factory, participation_factory, rating_factory,
+):
+    """Участник (attended) с оценкой: can_rate=False."""
+    activity = activity_factory(
+        start_at=timezone.now() - timedelta(hours=3),
+        end_at=timezone.now() - timedelta(hours=1),
+    )
+    participation_factory(activity, user, status='attended')
+    rating_factory(activity, user, rating=5)
+
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_rate'] is False
+
+
+def test_policy_flags_for_pending_participant(auth_client, user, activity_factory, participation_factory):
+    """Участник с pending-заявкой: can_cancel_request=True."""
+    activity = activity_factory(
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    participation_factory(activity, user, status='pending')
+
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_cancel_request'] is True
+    assert flags['can_join'] is False
+    assert flags['can_leave'] is False
+
+
+def test_policy_flags_for_cancelled_activity(auth_client, user, activity_factory):
+    """Отменённая активность: все флаги False."""
+    activity = activity_factory(
+        organizer=user,
+        status=Activity.Status.CANCELLED,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert all(not v for v in flags.values()), f'Expected all False, got {flags}'
+
+
+def test_policy_flags_for_full_activity(auth_client, user, activity_factory, participation_factory):
+    """Заполненная активность: can_join=False."""
+    activity = activity_factory(
+        pref_max_participants=1,
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    # организатор считается участником, поэтому pref_max_participants=1 уже заполнено
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_join'] is False
+
+
+def test_policy_flags_for_other_user_can_join(auth_client, user, activity_factory):
+    """Другой пользователь может вступить в активную активность."""
+    activity = activity_factory(
+        start_at=timezone.now() + timedelta(days=1),
+        end_at=timezone.now() + timedelta(days=1, hours=2),
+    )
+    detail = auth_client.get(f'/activities/{activity.id}')
+    flags = detail.json()['policy_flags']
+
+    assert flags['can_join'] is True
+    assert flags['can_leave'] is False
+    assert flags['can_cancel_request'] is False
+    assert flags['can_manage_requests'] is False
+    assert flags['can_rate'] is False
+    assert flags['can_edit'] is False
+    assert flags['can_cancel_activity'] is False

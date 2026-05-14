@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from users.serializers import UserSnippetSerializer
+from django.utils import timezone
 from .models import Activity
 
 
@@ -142,21 +143,12 @@ class ActivityDetailSerializer(ActivityListItemSerializer):
 
     def get_policy_flags(self, obj):
         """Флаги что пользователь может делать с этой активностью."""
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return {
-                'can_join': False,
-                'can_leave': False,
-                'can_cancel_request': False,
-                'can_manage_requests': False,
-                'can_rate': False,
-                'can_edit': False,
-                'can_cancel_activity': False,
-            }
-
-        user = request.user
+        user = self.context['request'].user
         is_organizer = obj.organizer_id == user.id
-        is_active = obj.status == Activity.Status.ACTIVE
+        is_not_cancelled = obj.status == Activity.Status.ACTIVE
+        now = timezone.now()
+        has_not_ended = obj.end_at > now
+        has_not_started = obj.start_at > now
 
         from participation.models import Participation
         participation_status = None
@@ -171,21 +163,26 @@ class ActivityDetailSerializer(ActivityListItemSerializer):
         is_full = self.get_is_full(obj)
         has_attended = participation_status == 'attended'
 
+        has_rated = False
+        if has_attended:
+            from ratings.models import ActivityRating
+            has_rated = ActivityRating.objects.filter(activity=obj, user=user).exists()
+
         return {
-            # вступить можно если активен, не организатор, не участник, не заполнен
-            'can_join': is_active and not is_organizer and not is_participant and not is_pending and not is_full,
-            # выйти можно если участник и активность ещё активна
-            'can_leave': is_active and is_participant and not is_organizer,
-            # отменить заявку можно если заявка pending
-            'can_cancel_request': is_pending,
-            # управлять заявками может только организатор
-            'can_manage_requests': is_organizer and is_active,
-            # оценить можно если посетил активность
-            'can_rate': has_attended and not is_organizer,
-            # редактировать может только организатор пока активность активна
-            'can_edit': is_organizer and is_active,
-            # отменить активность может только организатор
-            'can_cancel_activity': is_organizer and is_active,
+            # вступить можно если активна, не закончилась, не организатор, не участник, не заполнена
+            'can_join': is_not_cancelled and has_not_ended and not is_organizer and not is_participant and not is_pending and not is_full,
+            # выйти можно если участник (accepted) и активность ещё активна
+            'can_leave': is_not_cancelled and has_not_ended and participation_status == 'accepted' and not is_organizer,
+            # отменить заявку можно если заявка pending и активность активна
+            'can_cancel_request': is_not_cancelled and has_not_ended and is_pending,
+            # управлять заявками может только организатор пока активность активна
+            'can_manage_requests': is_not_cancelled and has_not_ended and is_organizer,
+            # оценить можно если посетил активность и ещё не оценил
+            'can_rate': has_attended and not is_organizer and not has_rated,
+            # редактировать может только организатор пока активность не началась
+            'can_edit': is_not_cancelled and has_not_started and is_organizer,
+            # отменить активность может только организатор пока не началась
+            'can_cancel_activity': is_not_cancelled and has_not_started and is_organizer,
         }
 
 
