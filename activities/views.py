@@ -157,6 +157,9 @@ def transfer_organizership_or_cancel(activity):
     Используется в двух сценариях:
     - текущий организатор удалил аккаунт (`MeView.delete`)
     - текущий организатор сам отказался от роли (`ActivityDeclineOrganizershipView`)
+
+    Для KudaGo-событий без участников — очищает организатора (делает NULL),
+    чтобы событие снова стало доступным для других желающих.
     """
     from participation.models import Participation
     from notifications.tasks import _create_notification_and_push
@@ -190,7 +193,14 @@ def transfer_organizership_or_cancel(activity):
         )
         return 'transferred'
 
-    # участников нет — отменяем
+    # участников нет
+    # Для KudaGo-события — очищаем организатора, событие снова свободно
+    if activity.source == Activity.Source.KUDAGO:
+        activity.organizer = None
+        activity.save(update_fields=['organizer'])
+        return 'freed'
+
+    # Для обычных активностей — отменяем
     activity.status = Activity.Status.CANCELLED
     activity.cancelled_at = timezone.now()
     activity.save(update_fields=['status', 'cancelled_at'])
@@ -263,6 +273,54 @@ class ActivityDeclineOrganizershipView(APIView):
             )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ActivityClaimOrganizershipView(APIView):
+    """POST /activities/:id/claim-organizership — стать организатором KudaGo-события.
+
+    Если у KudaGo-события нет организатора (organizer IS NULL),
+    пользователь может стать организатором. После этого событие
+    становится обычной пользовательской активностью.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, activity_id):
+        activity = get_object_or_404(Activity, id=activity_id)
+
+        # Проверяем, что это KudaGo-событие без организатора
+        if activity.source != Activity.Source.KUDAGO:
+            return Response(
+                {'error': {'code': 'FORBIDDEN', 'message': 'Только для KudaGo-событий'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if activity.organizer_id is not None:
+            return Response(
+                {'error': {'code': 'CONFLICT', 'message': 'У этого события уже есть организатор'}},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if activity.status != Activity.Status.ACTIVE:
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже отменена или завершена'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if activity.end_at <= timezone.now():
+            return Response(
+                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже закончилась'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Назначаем пользователя организатором
+        activity.organizer = request.user
+        activity.save(update_fields=['organizer'])
+
+        # Уведомляем подписчиков о новой активности
+        from notifications.tasks import notify_followers_of_new_activity
+        notify_followers_of_new_activity.delay(activity.id)
+
+        return Response(
+            ActivityDetailSerializer(activity, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 def apply_activity_filters(

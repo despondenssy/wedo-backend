@@ -157,3 +157,59 @@ sudo -u postgres psql -c "ALTER USER wedo_user CREATEDB;"
 ```
 
 В тестах Celery работает в eager-режиме (синхронно в процессе теста), Redis и worker не нужны.
+
+---
+
+## Ручной запуск management-команд
+
+### Импорт событий из KudaGo
+
+```bash
+python manage.py import_kudago
+```
+
+Команда загружает события из публичного API KudaGo и сохраняет их как активности с `source='kudago'`.
+
+**Основные параметры:**
+
+| Параметр | Описание | По умолчанию |
+|---|---|---|
+| `--location` | Код города (`msk`, `spb`, `nsk` и т.д.) | Все доступные города |
+| `--categories` | Фильтр по категориям через запятую (`concert,theater`) | Все категории |
+| `--days-ahead` | Горизонт импорта в днях | `30` |
+| `--page-size` | Размер страницы (макс. 100) | `100` |
+| `--max-pages` | Максимум страниц для загрузки | `10` |
+| `--dry-run` | Режим проверки без сохранения | `False` |
+
+Примеры:
+
+```bash
+# Импорт событий Москвы на 7 дней вперёд (проверка)
+python manage.py import_kudago --location msk --days-ahead 7 --dry-run
+
+# Импорт концертов и театров Санкт-Петербурга
+python manage.py import_kudago --location spb --categories concert,theater
+
+# Быстрый импорт — 1 страница по 15 событий
+python manage.py import_kudago --days-ahead 1 --page-size 15 --max-pages 1
+```
+
+### Очистка устаревших KudaGo-событий
+
+```bash
+python manage.py cleanup_kudago
+```
+
+Команда удаляет события из KudaGo (`source='kudago'`, `organizer IS NULL`), у которых `end_at` уже наступил, вместе с привязанными фото.
+
+**Параметры:**
+
+| Параметр | Описание |
+|---|---|
+| `--dry-run` | Режим проверки: показать количество событий к удалению без фактического удаления |
+
+Пример:
+
+```bash
+python manage.py cleanup_kudago --dry-run
+```

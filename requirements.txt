@@ -47,4 +47,5 @@ redis==5.0.8
 requests==2.33.1
 sqlparse==0.5.5
 typing_extensions==4.15.0
+timezonefinder==8.2.4
 urllib3==2.6.3

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from dotenv import load_dotenv
+from celery.schedules import crontab
 import os
 
 load_dotenv()
@@ -225,5 +226,15 @@ CELERY_BEAT_SCHEDULE = {
     'mark-unscanned-as-missed': {
         'task': 'notifications.tasks.mark_unscanned_as_missed',
         'schedule': 600.0,
+    },
+    # каждый день в 3:00 MSK — импорт событий из KudaGo API
+    'kudago-import': {
+        'task': 'activities.tasks.kudago_import',
+        'schedule': crontab(hour=0, minute=0),  # 00:00 UTC = 03:00 MSK
+    },
+    # каждый день в 4:00 MSK — очистка устаревших KudaGo-событий
+    'kudago-cleanup': {
+        'task': 'activities.tasks.kudago_cleanup',
+        'schedule': crontab(hour=1, minute=0),  # 01:00 UTC = 04:00 MSK
     },
 }

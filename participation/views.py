@@ -38,6 +38,13 @@ class ActivityJoinView(APIView):
     def post(self, request, activity_id):
         activity = get_object_or_404(Activity, id=activity_id, status=Activity.Status.ACTIVE)
 
+        # KudaGo-событие без организатора — нельзя вступить (некому подтверждать)
+        if activity.source == Activity.Source.KUDAGO and activity.organizer_id is None:
+            return Response(
+                {'error': {'code': 'NO_ORGANIZER', 'message': 'У этого события пока нет организатора'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if activity.organizer == request.user:
             return Response(
                 {'error': {'code': 'FORBIDDEN', 'message': 'Организатор не может участвовать в своей активности'}},
@@ -87,6 +94,13 @@ class ActivityRequestMeView(APIView):
 
     def post(self, request, activity_id):
         activity = get_object_or_404(Activity, id=activity_id, status=Activity.Status.ACTIVE)
+
+        # KudaGo-событие без организатора — нельзя подать заявку (некому подтверждать)
+        if activity.source == Activity.Source.KUDAGO and activity.organizer_id is None:
+            return Response(
+                {'error': {'code': 'NO_ORGANIZER', 'message': 'У этого события пока нет организатора'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if activity.organizer == request.user:
             return Response(

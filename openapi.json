@@ -215,14 +215,16 @@
           "subcategory_id": { "type": "string", "nullable": true },
           "cover_photo_file_id": { "type": "string", "nullable": true },
           "photo_file_ids": { "type": "array", "items": { "type": "string" } },
-          "organizer": { "$ref": "#/components/schemas/UserSnippet" },
+          "organizer": { "$ref": "#/components/schemas/UserSnippet", "nullable": true, "description": "null для KudaGo-событий без организатора" },
+          "source": { "type": "string", "enum": ["User", "KudaGo"], "description": "Источник события: User — создано пользователем, KudaGo — импортировано из KudaGo" },
+          "kudago_url": { "type": "string", "nullable": true, "description": "Ссылка на оригинал события на KudaGo" },
           "participants_count": { "type": "integer" },
           "requires_approval": { "type": "boolean" },
           "preferences": { "allOf": [{ "$ref": "#/components/schemas/ActivityPreferences" }], "nullable": true },
           "pending_requests_count": { "type": "integer", "nullable": true },
           "price": { "type": "number" }
         },
-        "required": ["id", "title", "start_at", "end_at", "time_zone", "format", "status", "location", "category_id", "photo_file_ids", "organizer", "participants_count", "requires_approval", "price"]
+        "required": ["id", "title", "start_at", "end_at", "time_zone", "format", "status", "location", "category_id", "photo_file_ids", "organizer", "source", "participants_count", "requires_approval", "price"]
       },
       "ActivityDetail": {
         "allOf": [
@@ -246,9 +248,10 @@
                   "can_manage_requests": { "type": "boolean" },
                   "can_rate": { "type": "boolean" },
                   "can_edit": { "type": "boolean" },
-                  "can_cancel_activity": { "type": "boolean" }
+                  "can_cancel_activity": { "type": "boolean" },
+                  "can_become_organizer": { "type": "boolean" }
                 },
-                "required": ["can_join", "can_leave", "can_cancel_request", "can_manage_requests", "can_rate", "can_edit", "can_cancel_activity"]
+                "required": ["can_join", "can_leave", "can_cancel_request", "can_manage_requests", "can_rate", "can_edit", "can_cancel_activity", "can_become_organizer"]
               }
             },
             "required": ["description", "time_zone", "participants_preview", "is_saved", "is_full", "policy_flags"]
@@ -1108,6 +1111,50 @@
         }
       }
     },
+    "/activities/{activity_id}/claim-organizership": {
+      "post": {
+        "tags": ["activities"],
+        "summary": "Claim organizership of a KudaGo event",
+        "description": "Стать организатором KudaGo-события, у которого ещё нет организатора.",
+        "parameters": [
+          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organizership claimed successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
+              }
+            }
+          },
+          "400": {
+            "description": "Event has already ended",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Activity is not a KudaGo event or caller is already the organizer",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "Event already has an organizer",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/saved-activities": {
       "get": {
         "tags": ["activities"],
@@ -1168,7 +1215,7 @@
         "responses": {
           "204": { "description": "Success" },
           "400": {
-            "description": "Activity requires approval, already joined, or activity is full",
+            "description": "Activity requires approval, already joined, activity is full, or KudaGo event has no organizer",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }
@@ -1223,7 +1270,23 @@
           { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
-          "204": { "description": "Success" }
+          "204": { "description": "Success" },
+          "400": {
+            "description": "Already requested or KudaGo event has no organizer",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Organizer cannot request their own activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
         }
       },
       "delete": {

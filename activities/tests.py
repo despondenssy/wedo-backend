@@ -546,3 +546,393 @@ def test_policy_flags_for_other_user_can_join(auth_client, user, activity_factor
     assert flags['can_rate'] is False
     assert flags['can_edit'] is False
     assert flags['can_cancel_activity'] is False
+
+
+# ===== KudaGo integration tests =====
+
+
+def test_kudago_activity_serializer_source_field(auth_client, activity_factory):
+    """Проверяем, что source в JSON возвращается как 'KudaGo' для kudago-событий."""
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        kudago_id=100500,
+        kudago_url='https://kudago.com/msk/event/test/',
+        organizer=None,
+    )
+    response = auth_client.get(f'/activities/{activity.id}')
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data['source'] == 'KudaGo'
+    assert data['kudago_url'] == 'https://kudago.com/msk/event/test/'
+
+
+def test_kudago_activity_serializer_source_user(auth_client, activity_factory):
+    """Проверяем, что для обычных событий source = 'User'."""
+    activity = activity_factory(source=Activity.Source.USER)
+    response = auth_client.get(f'/activities/{activity.id}')
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data['source'] == 'User'
+
+
+def test_kudago_activity_organizer_nullable(auth_client, activity_factory):
+    """Проверяем, что organizer может быть null для KudaGo-события."""
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100501,
+    )
+    response = auth_client.get(f'/activities/{activity.id}')
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data['organizer'] is None
+
+
+def test_kudago_activity_can_become_organizer_flag(auth_client, activity_factory):
+    """Проверяем policy_flags для KudaGo-события без организатора."""
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100502,
+    )
+    response = auth_client.get(f'/activities/{activity.id}')
+    assert response.status_code == status.HTTP_200_OK
+    flags = response.json()['policy_flags']
+    assert flags['can_become_organizer'] is True
+    assert flags['can_join'] is False  # без организатора нельзя присоединиться
+
+
+def test_kudago_activity_can_become_organizer_false_when_has_organizer(auth_client, activity_factory, user_factory):
+    """Проверяем, что can_become_organizer=False, если у KudaGo-события уже есть организатор."""
+    organizer = user_factory()
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=organizer,
+        kudago_id=100503,
+    )
+    response = auth_client.get(f'/activities/{activity.id}')
+    assert response.status_code == status.HTTP_200_OK
+    flags = response.json()['policy_flags']
+    assert flags['can_become_organizer'] is False
+
+
+def test_claim_organizership_success(auth_client, activity_factory, user_factory):
+    """Проверяем успешное взятие организаторства над KudaGo-событием."""
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100504,
+    )
+    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data['organizer'] is not None
+    assert data['source'] == 'KudaGo'
+
+    # Проверяем, что организатор действительно назначен в БД
+    activity.refresh_from_db()
+    assert activity.organizer is not None
+
+
+def test_claim_organizership_already_has_organizer(auth_client, activity_factory, user_factory):
+    """Проверяем, что нельзя стать организатором, если он уже есть."""
+    organizer = user_factory()
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=organizer,
+        kudago_id=100505,
+    )
+    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+def test_claim_organizership_not_kudago(auth_client, activity_factory):
+    """Проверяем, что нельзя стать организатором обычного события."""
+    activity = activity_factory(source=Activity.Source.USER)
+    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_claim_organizership_ended_event(auth_client, activity_factory):
+    """Проверяем, что нельзя стать организатором завершённого события."""
+    activity = activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100506,
+        end_at=timezone.now() - timedelta(hours=1),
+    )
+    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_cleanup_kudago_command_deletes_expired(auth_client, activity_factory, user_factory):
+    """Проверяем, что management command cleanup_kudago удаляет устаревшие KudaGo-события."""
+    from django.core.management import call_command
+
+    # Создаём устаревшее KudaGo-событие (без организатора, закончилось)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100507,
+        end_at=timezone.now() - timedelta(days=1),
+    )
+    # Создаём активное KudaGo-событие (не должно удалиться)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100508,
+        end_at=timezone.now() + timedelta(days=1),
+    )
+    # Создаём устаревшее KudaGo-событие с организатором (не должно удалиться)
+    organizer = user_factory()
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=organizer,
+        kudago_id=100509,
+        end_at=timezone.now() - timedelta(days=1),
+    )
+
+    call_command('cleanup_kudago')
+
+    remaining = Activity.objects.filter(source=Activity.Source.KUDAGO).count()
+    assert remaining == 2  # активное + с организатором
+
+
+def test_cleanup_kudago_dry_run_does_not_delete(auth_client, activity_factory):
+    """Проверяем, что dry-run не удаляет события."""
+    from django.core.management import call_command
+
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100510,
+        end_at=timezone.now() - timedelta(days=1),
+    )
+
+    call_command('cleanup_kudago', '--dry-run')
+
+    remaining = Activity.objects.filter(source=Activity.Source.KUDAGO).count()
+    assert remaining == 1
+
+
+def test_kudago_activity_list_item_has_source(auth_client, activity_factory):
+    """Проверяем, что в списке активностей тоже приходит source."""
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100511,
+    )
+    activity_factory(source=Activity.Source.USER)
+
+    response = auth_client.get('/activities')
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()['items']
+    sources = {item['source'] for item in items}
+    assert 'KudaGo' in sources
+    assert 'User' in sources
+
+
+def test_kudago_map_event_to_activity_multi_date(activity_factory):
+    """Проверяем _map_event_to_activity: мульти-дейт, фильтрация по окну, requires_approval, is_free, crafts→painting."""
+    from activities.management.commands.import_kudago import _map_event_to_activity
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    day = 86400
+
+    event: dict = {
+        "id": 999001,
+        "title": "Мастер-класс по рисованию",
+        "short_title": "Рисование",
+        "description": "Научимся рисовать акварелью",
+        "tagline": "Творческий вечер",
+        "body_text": "",
+        "site_url": "https://kudago.ru/event/999001",
+        "categories": ["creative"],
+        "location": {"slug": "msk", "name": "Москва"},
+        "place": {
+            "title": "Арт-студия",
+            "coords": {"lat": 55.75, "lon": 37.61},
+            "address": "ул. Тверская, 1",
+        },
+        "dates": [
+            {"start": now_ts + day, "end": now_ts + day + 7200},
+            {"start": now_ts + 2 * day, "end": now_ts + 2 * day + 7200},
+            {"start": now_ts + 3 * day, "end": now_ts + 3 * day + 7200},
+        ],
+        "images": [],
+        "is_free": True,
+        "age_restriction": "12+",
+        "price": "",
+    }
+
+    actual_since = now_ts
+    actual_until = now_ts + 3 * day  # третья дата на границе — попадает
+
+    activities = _map_event_to_activity(event, "msk", actual_since, actual_until)
+
+    # Должно быть 3 Activity (все даты в окне)
+    assert len(activities) == 3, f"Expected 3 activities, got {len(activities)}"
+
+    # Все имеют одинаковый kudago_id (оригинальный event["id"])
+    for ad in activities:
+        assert ad["kudago_id"] == 999001
+
+    # Все имеют разные start_at
+    start_ats = [ad["start_at"] for ad in activities]
+    assert len(set(start_ats)) == 3
+
+    # requires_approval=False
+    for ad in activities:
+        assert ad["requires_approval"] is False
+
+    # is_free → price=0
+    for ad in activities:
+        assert ad["price"] == 0.0
+
+    # category/subcategory
+    for ad in activities:
+        assert ad["category_id"] == "creative"
+        # description содержит "акварел" → subcategory должна быть "painting"
+        assert ad["subcategory_id"] == "painting"
+
+    # description: body_text пустой, description есть → берётся description
+    for ad in activities:
+        assert "акварелью" in ad["description"]
+
+
+def test_kudago_map_event_to_activity_description_with_tagline(activity_factory):
+    """Если нет body_text и description, но есть tagline — description = 'title · tagline'."""
+    from activities.management.commands.import_kudago import _map_event_to_activity
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    day = 86400
+
+    event: dict = {
+        "id": 999002,
+        "title": "Концерт",
+        "short_title": "",
+        "description": "",
+        "body_text": "",
+        "tagline": "Лучшие хиты",
+        "site_url": "https://kudago.ru/event/999002",
+        "categories": ["concert"],
+        "location": {"slug": "msk", "name": "Москва"},
+        "place": {
+            "title": "Клуб",
+            "coords": {"lat": 55.75, "lon": 37.61},
+            "address": "ул. Арбат, 10",
+        },
+        "dates": [
+            {"start": now_ts + day, "end": now_ts + day + 7200},
+        ],
+        "images": [],
+        "is_free": False,
+        "age_restriction": "",
+        "price": "1000",
+    }
+
+    activities = _map_event_to_activity(event, "msk", now_ts, now_ts + 2 * day)
+    assert len(activities) == 1
+    assert activities[0]["description"] == "Концерт · Лучшие хиты"
+
+
+def test_kudago_map_event_to_activity_filters_dates_outside_window(activity_factory):
+    """Даты вне окна actual_since..actual_until отфильтровываются."""
+    from activities.management.commands.import_kudago import _map_event_to_activity
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    day = 86400
+
+    event: dict = {
+        "id": 999003,
+        "title": "Фестиваль",
+        "description": "Большой фестиваль",
+        "site_url": "https://kudago.ru/event/999003",
+        "categories": ["concert"],
+        "location": {"slug": "msk", "name": "Москва"},
+        "place": {
+            "title": "Парк",
+            "coords": {"lat": 55.75, "lon": 37.61},
+            "address": "Парк Горького",
+        },
+        "dates": [
+            {"start": now_ts - 10 * day},   # прошлое — мимо
+            {"start": now_ts + day},          # в окне
+            {"start": now_ts + 5 * day},      # в окне
+            {"start": now_ts + 20 * day},     # будущее — мимо
+        ],
+        "images": [],
+        "is_free": False,
+        "age_restriction": "",
+        "price": "",
+    }
+
+    actual_since = now_ts
+    actual_until = now_ts + 10 * day
+
+    activities = _map_event_to_activity(event, "msk", actual_since, actual_until)
+    assert len(activities) == 2
+
+
+def test_kudago_map_event_to_activity_returns_empty_for_no_coords(activity_factory):
+    """Если нет координат — time_zone=None → возвращаем пустой список."""
+    from activities.management.commands.import_kudago import _map_event_to_activity
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    day = 86400
+
+    event: dict = {
+        "id": 999004,
+        "title": "Событие без координат",
+        "description": "Где-то далеко",
+        "site_url": "https://kudago.ru/event/999004",
+        "categories": ["concert"],
+        "location": {"slug": "msk", "name": "Москва"},
+        "place": {
+            "title": "Неизвестное место",
+            "coords": {},
+            "address": "",
+        },
+        "dates": [
+            {"start": now_ts + day},
+        ],
+        "images": [],
+        "is_free": False,
+        "age_restriction": "",
+        "price": "",
+    }
+
+    activities = _map_event_to_activity(event, "msk", now_ts, now_ts + 2 * day)
+    assert activities == []
+
+
+def test_kudago_map_event_to_activity_returns_empty_for_no_site_url(activity_factory):
+    """Если нет site_url — возвращаем пустой список."""
+    from activities.management.commands.import_kudago import _map_event_to_activity
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    day = 86400
+
+    event: dict = {
+        "id": 999005,
+        "title": "Событие без ссылки",
+        "description": "Описание",
+        "site_url": "",
+        "categories": ["concert"],
+        "location": {"slug": "msk", "name": "Москва"},
+        "place": {
+            "title": "Место",
+            "coords": {"lat": 55.75, "lon": 37.61},
+            "address": "Адрес",
+        },
+        "dates": [
+            {"start": now_ts + day},
+        ],
+        "images": [],
+        "is_free": False,
+        "age_restriction": "",
+        "price": "",
+    }
+
+    activities = _map_event_to_activity(event, "msk", now_ts, now_ts + 2 * day)
+    assert activities == []

@@ -28,7 +28,8 @@ class PreferencesSerializer(serializers.Serializer):
 class ActivityListItemSerializer(serializers.ModelSerializer):
     """Лёгкая карточка для ленты — без описания и полных коллекций."""
     id = serializers.CharField()
-    organizer = UserSnippetSerializer()
+    organizer = UserSnippetSerializer(allow_null=True)
+    source = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     preferences = serializers.SerializerMethodField()
     participants_count = serializers.SerializerMethodField()
@@ -41,9 +42,16 @@ class ActivityListItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'start_at', 'end_at', 'time_zone', 'format', 'status',
             'location', 'category_id', 'subcategory_id', 'cover_photo_file_id',
-            'photo_file_ids', 'organizer', 'participants_count', 'pending_requests_count',
+            'photo_file_ids', 'organizer', 'source', 'kudago_url',
+            'participants_count', 'pending_requests_count',
             'requires_approval', 'preferences', 'price',
         ]
+
+    def get_source(self, obj):
+        """Преобразует значение source из БД в формат для фронтенда."""
+        if obj.source == Activity.Source.KUDAGO:
+            return "KudaGo"
+        return "User"
 
     def get_location(self, obj):
         return obj.location
@@ -168,9 +176,16 @@ class ActivityDetailSerializer(ActivityListItemSerializer):
             from ratings.models import ActivityRating
             has_rated = ActivityRating.objects.filter(activity=obj, user=user).exists()
 
+        # KudaGo-событие без организатора — можно стать организатором
+        is_kudago_without_organizer = (
+            obj.source == Activity.Source.KUDAGO
+            and obj.organizer_id is None
+        )
+
         return {
             # вступить можно если активна, не закончилась, не организатор, не участник, не заполнена
-            'can_join': is_not_cancelled and has_not_ended and not is_organizer and not is_participant and not is_pending and not is_full,
+            # для KudaGo-событий без организатора вступить нельзя (некому подтверждать)
+            'can_join': not is_kudago_without_organizer and is_not_cancelled and has_not_ended and not is_organizer and not is_participant and not is_pending and not is_full,
             # выйти можно если участник (accepted) и активность ещё активна
             'can_leave': is_not_cancelled and has_not_ended and participation_status == 'accepted' and not is_organizer,
             # отменить заявку можно если заявка pending и активность активна
@@ -183,6 +198,8 @@ class ActivityDetailSerializer(ActivityListItemSerializer):
             'can_edit': is_not_cancelled and has_not_started and is_organizer,
             # отменить активность может только организатор пока не началась
             'can_cancel_activity': is_not_cancelled and has_not_started and is_organizer,
+            # стать организатором KudaGo-события (если ещё никто не стал)
+            'can_become_organizer': is_not_cancelled and has_not_ended and is_kudago_without_organizer,
         }
 
 

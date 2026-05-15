@@ -3,6 +3,10 @@ from django.conf import settings
 
 
 class Activity(models.Model):
+    class Source(models.TextChoices):
+        USER = 'user', 'User'
+        KUDAGO = 'kudago', 'KudaGo'
+
     class Format(models.TextChoices):
         ONLINE = 'online', 'Online'
         OFFLINE = 'offline', 'Offline'
@@ -20,11 +24,20 @@ class Activity(models.Model):
         MALE = 'male', 'Male'
         FEMALE = 'female', 'Female'
 
+    source = models.CharField(
+        max_length=10,
+        choices=Source.choices,
+        default=Source.USER,
+    )
     organizer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='organized_activities',
+        null=True,
+        blank=True,
     )
+    kudago_id = models.IntegerField(null=True, blank=True)
+    kudago_url = models.URLField(null=True, blank=True, max_length=500)
     title = models.CharField(max_length=255)
     description = models.TextField()
     category_id = models.CharField(max_length=100)
@@ -66,6 +79,12 @@ class Activity(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Activity'
         verbose_name_plural = 'Activities'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['kudago_id', 'start_at'],
+                name='unique_kudago_per_date',
+            ),
+        ]
         indexes = [
             # /activities и /activities/recommended фильтруют по статусу + времени старта
             models.Index(fields=['status', 'start_at']),

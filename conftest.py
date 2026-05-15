@@ -98,7 +98,10 @@ def activity_factory(db, user_factory):
     def create_activity(**kwargs):
         counter['value'] += 1
         n = counter['value']
-        organizer = kwargs.pop('organizer', None) or user_factory()
+        if 'organizer' in kwargs:
+            organizer = kwargs.pop('organizer')
+        else:
+            organizer = user_factory()
         defaults = {
             'organizer': organizer,
             'title': f'Activity {n}',
