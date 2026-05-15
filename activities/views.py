@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
 
 from .models import Activity, SavedActivity
@@ -127,26 +127,42 @@ def _apply_start_at_window_filters(queryset, *, date_from, date_to, time_from, t
 
 
 def _decode_cursor(cursor):
-    """Разбирает составной курсор 'value:id' или простой 'id'.
+    """Разбирает составной курсор 'sourceOrder_value_id', 'value_id' или простой 'id'.
 
-    В случае невалидного курсора (непарсируемый id) возвращает (None, None),
-    чтобы вызывающая сторона могла корректно обработать ошибку.
+    Все части разделяются '_' для избежания конфликтов с ':' в datetime-строках.
+
+    Возвращает (source_order, value, id):
+    - source_order: int (0=user, 1=kudago) или None если не указан
+    - value: str значение поля сортировки или None
+    - id: int id последнего элемента или None
+
+    В случае невалидного курсора возвращает (None, None, None).
     """
     if not cursor:
-        return None, None
+        return None, None, None
     try:
-        if ':' in cursor:
-            value, obj_id = cursor.split(':', 1)
-            return value, int(obj_id)
-        return None, int(cursor)
+        parts = cursor.split('_')
+        if len(parts) == 3:
+            # Трёхкомпонентный 'sourceOrder_value_id'
+            return int(parts[0]), parts[1], int(parts[2])
+        if len(parts) == 2:
+            # Двухкомпонентный 'value_id'
+            return None, parts[0], int(parts[1])
+        # Простой 'id'
+        return None, None, int(cursor)
     except (ValueError, TypeError):
-        return None, None
+        return None, None, None
 
 
-def _encode_cursor(obj, sort_field):
-    """Кодирует составной курсор 'sort_field_value:id'."""
+def _encode_cursor(obj, sort_field, source_order=None):
+    """Кодирует составной курсор 'sourceOrder_value_id' или 'value_id'.
+
+    Все части разделяются '_' для избежания конфликтов с ':' в datetime-строках.
+    """
     value = getattr(obj, sort_field)
-    return f'{value}:{obj.id}'
+    if source_order is not None:
+        return f'{source_order}_{value}_{obj.id}'
+    return f'{value}_{obj.id}'
 
 
 def transfer_organizership_or_cancel(activity):
@@ -275,54 +291,6 @@ class ActivityDeclineOrganizershipView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ActivityClaimOrganizershipView(APIView):
-    """POST /activities/:id/claim-organizership — стать организатором KudaGo-события.
-
-    Если у KudaGo-события нет организатора (organizer IS NULL),
-    пользователь может стать организатором. После этого событие
-    становится обычной пользовательской активностью.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, activity_id):
-        activity = get_object_or_404(Activity, id=activity_id)
-
-        # Проверяем, что это KudaGo-событие без организатора
-        if activity.source != Activity.Source.KUDAGO:
-            return Response(
-                {'error': {'code': 'FORBIDDEN', 'message': 'Только для KudaGo-событий'}},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        if activity.organizer_id is not None:
-            return Response(
-                {'error': {'code': 'CONFLICT', 'message': 'У этого события уже есть организатор'}},
-                status=status.HTTP_409_CONFLICT,
-            )
-        if activity.status != Activity.Status.ACTIVE:
-            return Response(
-                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже отменена или завершена'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if activity.end_at <= timezone.now():
-            return Response(
-                {'error': {'code': 'INVALID_STATE', 'message': 'Активность уже закончилась'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Назначаем пользователя организатором
-        activity.organizer = request.user
-        activity.save(update_fields=['organizer'])
-
-        # Уведомляем подписчиков о новой активности
-        from notifications.tasks import notify_followers_of_new_activity
-        notify_followers_of_new_activity.delay(activity.id)
-
-        return Response(
-            ActivityDetailSerializer(activity, context={'request': request}).data,
-            status=status.HTTP_200_OK,
-        )
-
-
 def apply_activity_filters(
     queryset,
     request,
@@ -342,6 +310,7 @@ def apply_activity_filters(
     , чтобы фильтры применялись консистентно.
     """
     q = request.query_params.get('q')
+    source = request.query_params.get('source')
     category_id = request.query_params.get('category_id')
     subcategory_id = request.query_params.get('subcategory_id')
     format_ = request.query_params.get('format')
@@ -375,6 +344,8 @@ def apply_activity_filters(
         queryset = queryset.filter(subcategory_id=subcategory_id)
     if format_:
         queryset = queryset.filter(format=format_)
+    if source:
+        queryset = queryset.filter(source=source)
 
     if effective_city_settlement:
         queryset = queryset.filter(location_settlement__icontains=effective_city_settlement)
@@ -466,13 +437,31 @@ class ActivityListView(APIView):
         # --- сортировка ---
         sort = request.query_params.get('sort', 'created_at')
         order = request.query_params.get('order', 'desc')
+        source_filter = request.query_params.get('source')
 
         if order == 'asc':
             sort_field = sort
         else:
             sort_field = f'-{sort}'
 
-        queryset = queryset.order_by(sort_field)
+        # Аннотация для сортировки: user-события (0) перед kudago (1)
+        source_order_annotation = Case(
+            When(source=Activity.Source.USER, then=Value(0)),
+            When(source=Activity.Source.KUDAGO, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+
+        if source_filter:
+            # Фильтр по source передан — обычная сортировка
+            queryset = queryset.order_by(sort_field)
+            has_source_sort = False
+        else:
+            # Фильтр не передан — kudago-события в конец
+            queryset = queryset.annotate(
+                _source_order=source_order_annotation,
+            ).order_by('_source_order', sort_field)
+            has_source_sort = True
 
         # --- пагинация ---
         cursor = request.query_params.get('cursor')
@@ -482,13 +471,35 @@ class ActivityListView(APIView):
         is_default_sort = (sort == 'created_at' and order == 'desc')
 
         if cursor:
-            cursor_value, cursor_id = _decode_cursor(cursor)
-            if cursor_value is None and cursor_id is None:
+            cursor_source_order, cursor_value, cursor_id = _decode_cursor(cursor)
+            if cursor_source_order is None and cursor_value is None and cursor_id is None:
                 return Response(
                     {'detail': 'Invalid cursor format.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if is_default_sort:
+
+            if has_source_sort:
+                # Составная сортировка с source_order
+                # _source_order сортируется по возрастанию (0=user, 1=kudago)
+                # При desc: идём от меньшего source_order к большему → используем __gt
+                # При asc: идём от большего source_order к меньшему → используем __lt
+                if order == 'desc':
+                    queryset = queryset.filter(
+                        Q(_source_order__gt=cursor_source_order)
+                        | (Q(_source_order=cursor_source_order) & (
+                            Q(**{f'{sort}__lt': cursor_value})
+                            | (Q(**{f'{sort}__exact': cursor_value}) & Q(id__lt=cursor_id))
+                        ))
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(_source_order__lt=cursor_source_order)
+                        | (Q(_source_order=cursor_source_order) & (
+                            Q(**{f'{sort}__gt': cursor_value})
+                            | (Q(**{f'{sort}__exact': cursor_value}) & Q(id__gt=cursor_id))
+                        ))
+                    )
+            elif is_default_sort:
                 queryset = queryset.filter(id__lt=cursor_id)
             else:
                 if order == 'asc':
@@ -511,7 +522,11 @@ class ActivityListView(APIView):
 
         if has_more:
             last = items[-1]
-            if is_default_sort:
+            if has_source_sort:
+                # Составной курсор с source_order
+                source_order_val = getattr(last, '_source_order', 0)
+                next_cursor = _encode_cursor(last, sort, source_order=source_order_val)
+            elif is_default_sort:
                 next_cursor = str(last.id)
             else:
                 next_cursor = _encode_cursor(last, sort)

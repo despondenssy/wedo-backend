@@ -341,6 +341,7 @@ def test_activity_list_max_participants(auth_client, activity_factory):
 
 def test_activity_list_cursor_pagination_with_sort(auth_client, activity_factory):
     """cursor-пагинация работает с нестандартной сортировкой."""
+    from urllib.parse import quote
     a1 = activity_factory(price=100)
     a2 = activity_factory(price=50)
     a3 = activity_factory(price=200)
@@ -353,10 +354,10 @@ def test_activity_list_cursor_pagination_with_sort(auth_client, activity_factory
     assert body['items'][0]['id'] == str(a2.id)  # price=50
     assert body['has_more'] is True
     assert body['next_cursor'] is not None
-    assert ':' in body['next_cursor']  # составной курсор
+    assert '_' in body['next_cursor']  # составной курсор
 
     # следующая страница
-    resp2 = auth_client.get(f'/activities?sort=price&order=asc&limit=1&cursor={body["next_cursor"]}')
+    resp2 = auth_client.get(f'/activities?sort=price&order=asc&limit=1&cursor={quote(body["next_cursor"])}')
     assert resp2.status_code == status.HTTP_200_OK
     body2 = resp2.json()
     assert len(body2['items']) == 1
@@ -616,55 +617,6 @@ def test_kudago_activity_can_become_organizer_false_when_has_organizer(auth_clie
     assert flags['can_become_organizer'] is False
 
 
-def test_claim_organizership_success(auth_client, activity_factory, user_factory):
-    """Проверяем успешное взятие организаторства над KudaGo-событием."""
-    activity = activity_factory(
-        source=Activity.Source.KUDAGO,
-        organizer=None,
-        kudago_id=100504,
-    )
-    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data['organizer'] is not None
-    assert data['source'] == 'KudaGo'
-
-    # Проверяем, что организатор действительно назначен в БД
-    activity.refresh_from_db()
-    assert activity.organizer is not None
-
-
-def test_claim_organizership_already_has_organizer(auth_client, activity_factory, user_factory):
-    """Проверяем, что нельзя стать организатором, если он уже есть."""
-    organizer = user_factory()
-    activity = activity_factory(
-        source=Activity.Source.KUDAGO,
-        organizer=organizer,
-        kudago_id=100505,
-    )
-    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
-    assert response.status_code == status.HTTP_409_CONFLICT
-
-
-def test_claim_organizership_not_kudago(auth_client, activity_factory):
-    """Проверяем, что нельзя стать организатором обычного события."""
-    activity = activity_factory(source=Activity.Source.USER)
-    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_claim_organizership_ended_event(auth_client, activity_factory):
-    """Проверяем, что нельзя стать организатором завершённого события."""
-    activity = activity_factory(
-        source=Activity.Source.KUDAGO,
-        organizer=None,
-        kudago_id=100506,
-        end_at=timezone.now() - timedelta(hours=1),
-    )
-    response = auth_client.post(f'/activities/{activity.id}/claim-organizership')
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-
 def test_cleanup_kudago_command_deletes_expired(auth_client, activity_factory, user_factory):
     """Проверяем, что management command cleanup_kudago удаляет устаревшие KudaGo-события."""
     from django.core.management import call_command
@@ -904,6 +856,115 @@ def test_kudago_map_event_to_activity_returns_empty_for_no_coords(activity_facto
 
     activities = _map_event_to_activity(event, "msk", now_ts, now_ts + 2 * day)
     assert activities == []
+
+
+# ===== Source filter and sorting tests =====
+
+
+def test_activity_list_filter_by_source_user(auth_client, activity_factory):
+    """GET /activities?source=user возвращает только user-события."""
+    activity_factory(source=Activity.Source.USER)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100601,
+    )
+
+    response = auth_client.get('/activities?source=user')
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()['items']
+    assert all(item['source'] == 'User' for item in items)
+
+
+def test_activity_list_filter_by_source_kudago(auth_client, activity_factory):
+    """GET /activities?source=kudago возвращает только kudago-события."""
+    activity_factory(source=Activity.Source.USER)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100602,
+    )
+
+    response = auth_client.get('/activities?source=kudago')
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()['items']
+    assert all(item['source'] == 'KudaGo' for item in items)
+
+
+def test_activity_list_sorts_kudago_last(auth_client, activity_factory):
+    """Без фильтра source kudago-события в конце списка."""
+    activity_factory(source=Activity.Source.USER)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100603,
+    )
+
+    response = auth_client.get('/activities')
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()['items']
+    # Все User должны быть перед KudaGo
+    user_ids = [i['id'] for i in items if i['source'] == 'User']
+    kudago_ids = [i['id'] for i in items if i['source'] == 'KudaGo']
+    if user_ids and kudago_ids:
+        last_user_idx = max(items.index(u) for u in items if u['source'] == 'User')
+        first_kudago_idx = min(items.index(k) for k in items if k['source'] == 'KudaGo')
+        assert last_user_idx < first_kudago_idx
+
+
+def test_activity_list_source_filter_with_sort(auth_client, activity_factory):
+    """Фильтр source + сортировка работают вместе."""
+    activity_factory(source=Activity.Source.USER, price=100)
+    activity_factory(source=Activity.Source.USER, price=50)
+    activity_factory(
+        source=Activity.Source.KUDAGO,
+        organizer=None,
+        kudago_id=100604,
+        price=200,
+    )
+
+    # source=user + sort=price, order=asc
+    response = auth_client.get('/activities?source=user&sort=price&order=asc')
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()['items']
+    assert len(items) == 2
+    assert all(item['source'] == 'User' for item in items)
+    prices = [item['price'] for item in items]
+    assert prices == sorted(prices)
+
+
+def test_activity_list_cursor_pagination_with_source_sort(auth_client, activity_factory):
+    """Курсорная пагинация работает с source_order (kudago в конце)."""
+    from urllib.parse import urlencode
+    # Создаём 3 user и 2 kudago
+    for i in range(3):
+        activity_factory(source=Activity.Source.USER)
+    for i in range(2):
+        activity_factory(
+            source=Activity.Source.KUDAGO,
+            organizer=None,
+            kudago_id=100610 + i,
+        )
+
+    # Первая страница: limit=3, должны получить 3 user-события
+    resp1 = auth_client.get('/activities?limit=3')
+    assert resp1.status_code == status.HTTP_200_OK
+    body1 = resp1.json()
+    assert len(body1['items']) == 3
+    assert all(item['source'] == 'User' for item in body1['items'])
+    assert body1['has_more'] is True
+    assert body1['next_cursor'] is not None
+    # Курсор должен быть составным (3 части)
+    assert len(body1['next_cursor'].split('_')) == 3
+
+    # Вторая страница: должны получить оставшиеся kudago-события
+    params = urlencode({'limit': 3, 'cursor': body1['next_cursor']})
+    resp2 = auth_client.get(f'/activities?{params}')
+    assert resp2.status_code == status.HTTP_200_OK
+    body2 = resp2.json()
+    assert len(body2['items']) == 2
+    assert all(item['source'] == 'KudaGo' for item in body2['items'])
+    assert body2['has_more'] is False
 
 
 def test_kudago_map_event_to_activity_returns_empty_for_no_site_url(activity_factory):

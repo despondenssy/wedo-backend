@@ -12,6 +12,11 @@ local_settings.py
 db.sqlite3
 media/
 
+# Celery Beat schedule files
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+
 # Environment
 .env
 .env.docker
@@ -22,6 +27,7 @@ media/
 .vs/
 *.cursor
 .claude/
+plans/
 
 # Tests
 .pytest_cache/

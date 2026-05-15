@@ -66,7 +66,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"show_birth_date\": false\n}"
+              "raw": "{\n  \"name\": \"Student User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1998-05-20\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Москва\",\n    \"region\": \"Москва\",\n    \"country\": \"Россия\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Москва\"\n  },\n  \"interests\": [\"sport\", \"board-games\"],\n  \"show_birth_date\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -105,7 +105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{other_email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Moscow\"\n  },\n  \"interests\": [\"sport\", \"music\"],\n  \"show_birth_date\": false\n}"
+              "raw": "{\n  \"name\": \"Organizer User\",\n  \"email\": \"{{other_email}}\",\n  \"password\": \"{{password}}\",\n  \"birth_date\": \"1997-03-15\",\n  \"gender\": \"male\",\n  \"city\": {\n    \"settlement\": \"Москва\",\n    \"region\": \"Москва\",\n    \"country\": \"Россия\",\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"title\": \"Москва\"\n  },\n  \"interests\": [\"sport\", \"music\"],\n  \"show_birth_date\": false\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
@@ -262,7 +262,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Saint Petersburg\",\n    \"region\": \"Saint Petersburg\",\n    \"country\": \"Russia\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Saint Petersburg\"\n  },\n  \"interests\": [\"music\", \"sport\"],\n  \"show_birth_date\": true\n}"
+              "raw": "{\n  \"name\": \"Updated Student\",\n  \"gender\": \"female\",\n  \"city\": {\n    \"settlement\": \"Санкт-Петербург\",\n    \"region\": \"Санкт-Петербург\",\n    \"country\": \"Россия\",\n    \"latitude\": 59.93428,\n    \"longitude\": 30.3351,\n    \"title\": \"Санкт-Петербург\"\n  },\n  \"interests\": [\"music\", \"sport\"],\n  \"show_birth_date\": true\n}"
             },
             "url": "{{baseUrl}}/me"
           }
@@ -291,23 +291,6 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/me/qr-token"
-          }
-        },
-        {
-          "name": "Resolve QR Token",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"{{qr_token}}\"\n}"
-            },
-            "url": "{{baseUrl}}/qr-tokens/resolve"
           }
         },
         {
@@ -344,13 +327,6 @@
             "method": "GET",
             "url": "{{baseUrl}}/users/{{target_user_id}}/attendance-history"
           }
-        },
-        {
-          "name": "User Activity Feed",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/users/{{target_user_id}}/activity-feed?category=organizer&limit=20"
-          }
         }
       ]
     },
@@ -361,7 +337,7 @@
           "name": "List Activities",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/activities?city_settlement=Moscow&category_id=sport&limit=30"
+            "url": "{{baseUrl}}/activities?city_settlement=Москва&category_id=sport&limit=30"
           }
         },
         {
@@ -388,7 +364,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Evening Football\",\n  \"description\": \"Friendly training session for students.\",\n  \"category_id\": \"sport\",\n  \"subcategory_id\": \"football\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Red Square, Moscow\",\n    \"name\": \"City Center\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"start_at\": \"2026-05-20T17:00:00Z\",\n  \"end_at\": \"2026-05-20T19:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"age_from\": 18,\n    \"age_to\": 35,\n    \"level\": \"beginner\",\n    \"max_participants\": 10\n  },\n  \"requires_approval\": false,\n  \"photo_file_ids\": [],\n  \"price\": \"0.00\"\n}"
+              "raw": "{\n  \"title\": \"Evening Football\",\n  \"description\": \"Friendly training session for students.\",\n  \"category_id\": \"sport\",\n  \"subcategory_id\": \"football\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Красная площадь, Москва\",\n    \"name\": \"Центр города\",\n    \"settlement\": \"Москва\",\n    \"region\": \"Москва\",\n    \"country\": \"Россия\"\n  },\n  \"start_at\": \"2026-05-20T17:00:00Z\",\n  \"end_at\": \"2026-05-20T19:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"age_from\": 18,\n    \"age_to\": 35,\n    \"level\": \"beginner\",\n    \"max_participants\": 10\n  },\n  \"requires_approval\": false,\n  \"photo_file_ids\": [],\n  \"price\": \"0.00\"\n}"
             },
             "url": "{{baseUrl}}/activities"
           }
@@ -417,7 +393,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Closed Workshop\",\n  \"description\": \"Activity with manual approval.\",\n  \"category_id\": \"education\",\n  \"subcategory_id\": \"workshop\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Moscow\",\n    \"settlement\": \"Moscow\",\n    \"region\": \"Moscow\",\n    \"country\": \"Russia\"\n  },\n  \"start_at\": \"2026-05-25T15:00:00Z\",\n  \"end_at\": \"2026-05-25T17:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"max_participants\": 5\n  },\n  \"requires_approval\": true,\n  \"photo_file_ids\": [],\n  \"price\": \"100.00\"\n}"
+              "raw": "{\n  \"title\": \"Closed Workshop\",\n  \"description\": \"Activity with manual approval.\",\n  \"category_id\": \"education\",\n  \"subcategory_id\": \"workshop\",\n  \"format\": \"offline\",\n  \"location\": {\n    \"latitude\": 55.751244,\n    \"longitude\": 37.618423,\n    \"address\": \"Москва\",\n    \"settlement\": \"Москва\",\n    \"region\": \"Москва\",\n    \"country\": \"Россия\"\n  },\n  \"start_at\": \"2026-05-25T15:00:00Z\",\n  \"end_at\": \"2026-05-25T17:00:00Z\",\n  \"time_zone\": \"Europe/Moscow\",\n  \"preferences\": {\n    \"max_participants\": 5\n  },\n  \"requires_approval\": true,\n  \"photo_file_ids\": [],\n  \"price\": \"100.00\"\n}"
             },
             "url": "{{baseUrl}}/activities"
           }
@@ -461,6 +437,13 @@
           }
         },
         {
+          "name": "Decline Organizership",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/activities/{{activity_id}}/decline-organizership"
+          }
+        },
+        {
           "name": "Recommended Activities",
           "request": {
             "method": "GET",
@@ -479,7 +462,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"activities\": [\n    {\n      \"title\": \"Batch Activity 1\",\n      \"description\": \"Created from Postman batch request.\",\n      \"category_id\": \"sport\",\n      \"subcategory_id\": \"running\",\n      \"format\": \"offline\",\n      \"location\": {\n        \"latitude\": 55.75,\n        \"longitude\": 37.61,\n        \"address\": \"Moscow\",\n        \"settlement\": \"Moscow\",\n        \"region\": \"Moscow\",\n        \"country\": \"Russia\"\n      },\n      \"start_at\": \"2026-06-01T10:00:00Z\",\n      \"end_at\": \"2026-06-01T12:00:00Z\",\n      \"time_zone\": \"Europe/Moscow\",\n      \"requires_approval\": false,\n      \"photo_file_ids\": [],\n      \"price\": \"0.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"activities\": [\n    {\n      \"title\": \"Batch Activity 1\",\n      \"description\": \"Created from Postman batch request.\",\n      \"category_id\": \"sport\",\n      \"subcategory_id\": \"running\",\n      \"format\": \"offline\",\n      \"location\": {\n        \"latitude\": 55.75,\n        \"longitude\": 37.61,\n        \"address\": \"Москва\",\n        \"settlement\": \"Москва\",\n        \"region\": \"Москва\",\n        \"country\": \"Россия\"\n      },\n      \"start_at\": \"2026-06-01T10:00:00Z\",\n      \"end_at\": \"2026-06-01T12:00:00Z\",\n      \"time_zone\": \"Europe/Moscow\",\n      \"requires_approval\": false,\n      \"photo_file_ids\": [],\n      \"price\": \"0.00\"\n    }\n  ]\n}"
             },
             "url": "{{baseUrl}}/activities/batch"
           }

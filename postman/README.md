@@ -72,6 +72,7 @@ Invoke-WebRequest http://127.0.0.1:8000/api/openapi.json -UseBasicParsing
 ```text
 Activities / Get Activity
 Activities / Save Activity
+Activities / Decline Organizership
 Participation / Join Activity
 Notifications / List Notifications
 Ratings / List Activity Ratings
@@ -90,7 +91,7 @@ Ratings / List Activity Ratings
 2. В `Body -> form-data` выбрать файл в поле `file`.
 3. Отправить запрос.
 4. После успешного ответа сохранится `file_id`.
-5. Выполнить `Files / List Files By IDs` или `Files / Download File`.
+5. Выполнить `Files / Download File`.
 
 ## Документация
 

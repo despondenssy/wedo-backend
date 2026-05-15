@@ -901,6 +901,7 @@
         "summary": "List activities",
         "parameters": [
           { "name": "q", "in": "query", "schema": { "type": "string", "description": "Text search: substring (case-insensitive) in title, description, category_id and subcategory_id" } },
+          { "name": "source", "in": "query", "schema": { "type": "string", "enum": ["user", "kudago"], "description": "Filter by source: user — created by users, kudago — imported from KudaGo. When not set, KudaGo events are sorted to the end." } },
           { "name": "category_id", "in": "query", "schema": { "type": "string" } },
           { "name": "subcategory_id", "in": "query", "schema": { "type": "string" } },
           { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["online", "offline"] } },
@@ -1108,50 +1109,6 @@
           "204": { "description": "Organizership transferred or activity cancelled" },
           "400": { "description": "Activity is not active (already cancelled/finished)" },
           "403": { "description": "Caller is not the current organizer" }
-        }
-      }
-    },
-    "/activities/{activity_id}/claim-organizership": {
-      "post": {
-        "tags": ["activities"],
-        "summary": "Claim organizership of a KudaGo event",
-        "description": "Стать организатором KudaGo-события, у которого ещё нет организатора.",
-        "parameters": [
-          { "name": "activity_id", "in": "path", "required": true, "schema": { "type": "integer" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Organizership claimed successfully",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ActivityDetail" }
-              }
-            }
-          },
-          "400": {
-            "description": "Event has already ended",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
-          },
-          "403": {
-            "description": "Activity is not a KudaGo event or caller is already the organizer",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
-          },
-          "409": {
-            "description": "Event already has an organizer",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
-          }
         }
       }
     },
