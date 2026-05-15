@@ -30,7 +30,6 @@ def kudago_cleanup():
 
     Удаляет события, у которых:
     - source = 'kudago'
-    - organizer IS NULL (никто не стал организатором)
     - end_at < now() (уже закончились)
 
     Вызывает management command cleanup_kudago.

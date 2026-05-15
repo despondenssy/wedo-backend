@@ -617,11 +617,11 @@ def test_kudago_activity_can_become_organizer_false_when_has_organizer(auth_clie
     assert flags['can_become_organizer'] is False
 
 
-def test_cleanup_kudago_command_deletes_expired(auth_client, activity_factory, user_factory):
-    """Проверяем, что management command cleanup_kudago удаляет устаревшие KudaGo-события."""
+def test_cleanup_kudago_command_deletes_expired(auth_client, activity_factory):
+    """Проверяем, что management command cleanup_kudago удаляет все устаревшие KudaGo-события."""
     from django.core.management import call_command
 
-    # Создаём устаревшее KudaGo-событие (без организатора, закончилось)
+    # Создаём устаревшее KudaGo-событие (закончилось)
     activity_factory(
         source=Activity.Source.KUDAGO,
         organizer=None,
@@ -635,19 +635,11 @@ def test_cleanup_kudago_command_deletes_expired(auth_client, activity_factory, u
         kudago_id=100508,
         end_at=timezone.now() + timedelta(days=1),
     )
-    # Создаём устаревшее KudaGo-событие с организатором (не должно удалиться)
-    organizer = user_factory()
-    activity_factory(
-        source=Activity.Source.KUDAGO,
-        organizer=organizer,
-        kudago_id=100509,
-        end_at=timezone.now() - timedelta(days=1),
-    )
 
     call_command('cleanup_kudago')
 
     remaining = Activity.objects.filter(source=Activity.Source.KUDAGO).count()
-    assert remaining == 2  # активное + с организатором
+    assert remaining == 1  # только активное
 
 
 def test_cleanup_kudago_dry_run_does_not_delete(auth_client, activity_factory):

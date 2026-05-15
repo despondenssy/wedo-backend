@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Удаляет устаревшие KudaGo-события (source='kudago', organizer=NULL, end_at < now()) и их фото."
+    help = "Удаляет устаревшие KudaGo-события (source='kudago', end_at < now()) и их фото."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -34,7 +34,6 @@ class Command(BaseCommand):
 
         qs = Activity.objects.filter(
             source=Activity.Source.KUDAGO,
-            organizer__isnull=True,
             end_at__lt=now,
         )
         count = qs.count()
