@@ -66,13 +66,15 @@ class UpdateMeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['name', 'avatar_file_id', 'birth_date', 'gender', 'city', 'interests', 'show_birth_date']
+        fields = ['name', 'avatar_file_id', 'birth_date', 'gender', 'city', 'interests', 'show_birth_date', 'social_link', 'about_me']
         extra_kwargs = {
             'name': {'required': False},
             'birth_date': {'required': False},
             'gender': {'required': False},
             'interests': {'required': False},
             'show_birth_date': {'required': False},
+            'social_link': {'required': False},
+            'about_me': {'required': False},
         }
 
     def update(self, instance, validated_data):
@@ -120,6 +122,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'name', 'birth_date', 'avatar_file_id', 'rating', 'age', 'gender', 'show_birth_date',
             'city', 'interests', 'attendance_history',
             'reviews_preview', 'is_current_user', 'is_subscribed',
+            'social_link', 'about_me',
         ]
 
     def _is_current_user(self, obj):

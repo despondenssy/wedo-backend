@@ -134,6 +134,8 @@ class MeView(APIView):
         user.city_longitude = None
         user.city_title = None
         user.interests = []
+        user.social_link = None
+        user.about_me = None
         user.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)

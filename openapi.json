@@ -106,7 +106,9 @@
             }
           },
           "is_current_user": { "type": "boolean" },
-          "is_subscribed": { "type": "boolean", "nullable": true }
+          "is_subscribed": { "type": "boolean", "nullable": true },
+          "social_link": { "type": "string", "nullable": true, "description": "Ссылка на соцсеть" },
+          "about_me": { "type": "string", "nullable": true, "description": "Раздел «О себе»" }
         },
         "required": ["id", "name", "rating", "show_birth_date", "is_current_user"]
       },
@@ -158,7 +160,9 @@
           "gender": { "type": "string", "enum": ["male", "female", "notgiven"] },
           "city": { "$ref": "#/components/schemas/City" },
           "interests": { "type": "array", "items": { "type": "string" } },
-          "show_birth_date": { "type": "boolean" }
+          "show_birth_date": { "type": "boolean" },
+          "social_link": { "type": "string", "nullable": true, "description": "Ссылка на соцсеть" },
+          "about_me": { "type": "string", "nullable": true, "description": "Раздел «О себе»" }
         }
       },
       "QrScanRequest": {

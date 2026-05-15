@@ -37,6 +37,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     rating = models.FloatField(default=0.0)
     interests = models.JSONField(default=list, blank=True)
+    social_link = models.URLField(max_length=500, blank=True, null=True)
+    about_me = models.TextField(max_length=1000, blank=True, null=True)
 
     # city
     city_settlement = models.CharField(max_length=255, blank=True, null=True)

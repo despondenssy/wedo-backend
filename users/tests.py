@@ -39,6 +39,8 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
     assert response.status_code == status.HTTP_201_CREATED
     body = response.json()
     assert body['user']['show_birth_date'] is True
+    assert body['user']['social_link'] is None
+    assert body['user']['about_me'] is None
     assert body['tokens']['access_token']
     assert User.objects.filter(email='new@example.com').exists()
     user = User.objects.get(email='new@example.com')
@@ -179,6 +181,8 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
             },
             'interests': ['music'],
             'show_birth_date': True,
+            'social_link': 'https://t.me/testuser',
+            'about_me': 'Люблю спорт и путешествия',
         },
         format='json',
     )
@@ -187,7 +191,11 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     assert user.name == 'Updated'
     assert user.city_settlement == 'Saint Petersburg'
     assert user.show_birth_date is True
+    assert user.social_link == 'https://t.me/testuser'
+    assert user.about_me == 'Люблю спорт и путешествия'
     assert patch_response.json()['show_birth_date'] is True
+    assert patch_response.json()['social_link'] == 'https://t.me/testuser'
+    assert patch_response.json()['about_me'] == 'Люблю спорт и путешествия'
 
     delete_response = auth_client.delete('/me')
     user.refresh_from_db()
@@ -200,6 +208,8 @@ def test_me_get_patch_show_birth_date_and_delete(auth_client, user):
     assert user.email == f'deleted-{user.id}@deleted.local'
     assert user.city_settlement is None
     assert user.interests == []
+    assert user.social_link is None
+    assert user.about_me is None
 
 
 
