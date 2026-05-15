@@ -4,20 +4,25 @@ from django.conf import settings
 
 class Notification(models.Model):
     class Type(models.TextChoices):
-        REQUEST = 'request', 'Request'
-        SYSTEM = 'system', 'System'
-        REMINDER = 'reminder', 'Reminder'
-        SOCIAL = 'social', 'Social'
-        REQUEST_APPROVED = 'request_approved', 'Request Approved'
-        REQUEST_REJECTED = 'request_rejected', 'Request Rejected'
-        RATE_REQUEST = 'rate_request', 'Rate Request'
+        # действия с заявками
+        JOIN_REQUEST = 'join_request', 'Join Request'
+        JOIN_REQUEST_APPROVED = 'join_request_approved', 'Join Request Approved'
+        JOIN_REQUEST_REJECTED = 'join_request_rejected', 'Join Request Rejected'
+        # жизненный цикл активности
+        ACTIVITY_REMINDER = 'activity_reminder', 'Activity Reminder'
+        NEW_ACTIVITY = 'new_activity', 'New Activity'
+        ACTIVITY_CANCELLED = 'activity_cancelled', 'Activity Cancelled'
+        ORGANIZER_ASSIGNED = 'organizer_assigned', 'Organizer Assigned'
+        # оценки
+        RATE_ACTIVITY = 'rate_activity', 'Rate Activity'
+        NEW_REVIEW = 'new_review', 'New Review'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='notifications',
     )
-    type = models.CharField(max_length=20, choices=Type.choices)
+    type = models.CharField(max_length=30, choices=Type.choices)
     title = models.CharField(max_length=255)
     message = models.TextField()
     read_at = models.DateTimeField(blank=True, null=True)
@@ -27,14 +32,15 @@ class Notification(models.Model):
         blank=True,
         null=True,
     )
-    request_user = models.ForeignKey(
+    # пользователь, из-за действия которого появилось уведомление:
+    # для заявки — заявитель, для new_activity — организатор, для new_review — автор оценки
+    actor_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
         related_name='triggered_notifications',
     )
-    activity_title = models.CharField(max_length=255, blank=True, null=True)
     action_required = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

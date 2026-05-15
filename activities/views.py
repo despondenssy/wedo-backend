@@ -178,8 +178,7 @@ def transfer_organizership_or_cancel(activity):
     чтобы событие снова стало доступным для других желающих.
     """
     from participation.models import Participation
-    from notifications.tasks import _create_notification_and_push
-    from notifications.models import Notification
+    from notifications.services import notify_organizer_assigned, notify_activity_cancelled
 
     # следующий кандидат — по дате присоединения, accepted-участник
     next_p = (
@@ -197,16 +196,7 @@ def transfer_organizership_or_cancel(activity):
         activity.organizer = new_organizer
         activity.save(update_fields=['organizer'])
 
-        _create_notification_and_push(
-            user=new_organizer,
-            type=Notification.Type.SYSTEM,
-            title='Вы стали организатором',
-            message=(
-                f'Бывший организатор активности «{activity.title}» покинул её. '
-                f'Теперь вы организатор. Если не готовы — нажмите «отказаться».'
-            ),
-            activity=activity,
-        )
+        notify_organizer_assigned(new_organizer=new_organizer, activity=activity)
         return 'transferred'
 
     # участников нет
@@ -235,13 +225,7 @@ def transfer_organizership_or_cancel(activity):
         .select_related('user')
     )
     for p in remaining:
-        _create_notification_and_push(
-            user=p.user,
-            type=Notification.Type.SYSTEM,
-            title='Активность отменена',
-            message=f'«{activity.title}» отменена — не нашлось нового организатора.',
-            activity=activity,
-        )
+        notify_activity_cancelled(recipient=p.user, activity=activity)
     return 'cancelled'
 
 
@@ -611,7 +595,28 @@ class ActivityDetailView(APIView):
                 {'error': {'code': 'FORBIDDEN', 'message': 'Нет прав для удаления'}},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        activity.delete()
+
+        # Активную активность физически не удаляем: оставляем её в БД как cancelled,
+        # чтобы участники могли открыть её карточку из старых уведомлений и истории.
+        # Уже отменённую активность тоже не сносим.
+        if activity.status == Activity.Status.ACTIVE:
+            activity.status = Activity.Status.CANCELLED
+            activity.cancelled_at = timezone.now()
+            activity.save(update_fields=['status', 'cancelled_at'])
+
+            from participation.models import Participation
+            from notifications.services import notify_activity_cancelled
+            participations = Participation.objects.filter(
+                activity=activity,
+                status__in=[
+                    Participation.Status.ACCEPTED,
+                    Participation.Status.ATTENDED,
+                    Participation.Status.PENDING,
+                ],
+            ).select_related('user')
+            for p in participations:
+                notify_activity_cancelled(recipient=p.user, activity=activity)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -641,6 +646,21 @@ class ActivityCancelView(APIView):
         activity.cancelled_at = timezone.now()
         activity.save()
 
+        # шлём уведомление всем кто числился на отменённой активности —
+        # accepted, attended и pending (последние тоже должны узнать)
+        from participation.models import Participation
+        from notifications.services import notify_activity_cancelled
+        participations = Participation.objects.filter(
+            activity=activity,
+            status__in=[
+                Participation.Status.ACCEPTED,
+                Participation.Status.ATTENDED,
+                Participation.Status.PENDING,
+            ],
+        ).select_related('user')
+        for p in participations:
+            notify_activity_cancelled(recipient=p.user, activity=activity)
+
         return Response(ActivityDetailSerializer(activity, context={'request': request}).data)
 
 
@@ -656,6 +676,8 @@ class ActivityBatchCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from notifications.tasks import notify_followers_of_new_activity
+
         created = []
         for item in activities_data:
             serializer = CreateActivitySerializer(
@@ -665,6 +687,8 @@ class ActivityBatchCreateView(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             activity = serializer.save()
             created.append(activity)
+            # уведомление подписчикам организатора по каждой созданной активности
+            notify_followers_of_new_activity.delay(activity.id)
 
         return Response(
             ActivityDetailSerializer(created, many=True, context={'request': request}).data,

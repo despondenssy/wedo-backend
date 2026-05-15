@@ -19,13 +19,12 @@ class NotificationAdmin(admin.ModelAdmin):
     search_fields = (
         'title',
         'message',
-        'activity_title',
         'user__email',
         'user__name',
-        'request_user__email',
-        'request_user__name',
+        'actor_user__email',
+        'actor_user__name',
     )
-    autocomplete_fields = ('user', 'activity', 'request_user')
+    autocomplete_fields = ('user', 'activity', 'actor_user')
     readonly_fields = ('created_at', 'is_read')
-    list_select_related = ('user', 'activity', 'request_user')
+    list_select_related = ('user', 'activity', 'actor_user')
     ordering = ('-created_at',)

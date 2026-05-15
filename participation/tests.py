@@ -45,9 +45,9 @@ def test_join_success_duplicate_requires_approval_full_and_organizer_forbidden(
     assert full_response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@patch('participation.views._send_notification')
+@patch('notifications.services.notify_join_request')
 def test_join_request_list_cancel_approve_and_reject(
-    send_notification,
+    notify_mock,
     api_client,
     user,
     other_user,
@@ -58,7 +58,7 @@ def test_join_request_list_cancel_approve_and_reject(
     api_client.force_authenticate(user=user)
     requested = api_client.post(f'/activities/{activity.id}/join-requests/me', {}, format='json')
     assert requested.status_code == status.HTTP_204_NO_CONTENT
-    send_notification.assert_called_once()
+    notify_mock.assert_called_once()
 
     duplicate = api_client.post(f'/activities/{activity.id}/join-requests/me', {}, format='json')
     assert duplicate.status_code == status.HTTP_400_BAD_REQUEST

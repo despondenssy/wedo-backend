@@ -482,10 +482,10 @@ def test_organizer_deletion_transfers_activity_to_first_participant(
     # участие нового организатора удалено
     assert not Participation.objects.filter(activity=future, user=first_participant).exists()
 
-    # уведомление пришло именно ему
+    # уведомление пришло именно ему — теперь это типизированное ORGANIZER_ASSIGNED
     assert Notification.objects.filter(
         user=first_participant,
-        type=Notification.Type.SYSTEM,
+        type=Notification.Type.ORGANIZER_ASSIGNED,
         activity=future,
     ).exists()
 
@@ -554,7 +554,7 @@ def test_organizer_deletion_notifies_pending_requests_on_cancel(
     assert activity.status == Activity.Status.CANCELLED
     assert Notification.objects.filter(
         user=pending_user,
-        type=Notification.Type.SYSTEM,
+        type=Notification.Type.ACTIVITY_CANCELLED,
         activity=activity,
     ).exists()
 

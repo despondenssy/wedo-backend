@@ -10,27 +10,6 @@ from .models import Participation
 from .serializers import ActivityParticipantSerializer, ActivityJoinRequestSerializer
 
 
-def _send_notification(user, notification_type, title, message, activity, request_user=None):
-    """Создаёт in-app уведомление и отправляет push если есть device token."""
-    from notifications.models import Notification
-    from notifications.firebase import send_push_to_user
-
-    Notification.objects.create(
-        user=user,
-        type=notification_type,
-        title=title,
-        message=message,
-        activity=activity,
-        request_user=request_user,
-        activity_title=activity.title,
-        action_required=notification_type == 'request',
-    )
-    send_push_to_user(user, title, message, data={
-        'activity_id': str(activity.id),
-        'type': notification_type,
-    })
-
-
 class ActivityJoinView(APIView):
     """POST /activities/:id/join — вступить без подтверждения."""
     permission_classes = [IsAuthenticated]
@@ -120,13 +99,11 @@ class ActivityRequestMeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _send_notification(
-            user=activity.organizer,
-            notification_type='request',
-            title='Новая заявка',
-            message=f'{request.user.name} хочет участвовать в «{activity.title}»',
+        from notifications.services import notify_join_request
+        notify_join_request(
+            organizer=activity.organizer,
+            applicant=request.user,
             activity=activity,
-            request_user=request.user,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -193,13 +170,10 @@ class ActivityJoinRequestApproveView(APIView):
         participation.status = Participation.Status.ACCEPTED
         participation.save()
 
-        _send_notification(
-            user=participation.user,
-            notification_type='request_approved',
-            title='Заявка одобрена',
-            message=f'Ваша заявка на «{activity.title}» одобрена',
+        from notifications.services import notify_join_request_approved
+        notify_join_request_approved(
+            applicant=participation.user,
             activity=activity,
-            request_user=request.user,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -227,13 +201,10 @@ class ActivityJoinRequestRejectView(APIView):
         participation.status = Participation.Status.REJECTED
         participation.save()
 
-        _send_notification(
-            user=participation.user,
-            notification_type='request_rejected',
-            title='Заявка отклонена',
-            message=f'Ваша заявка на «{activity.title}» отклонена',
+        from notifications.services import notify_join_request_rejected
+        notify_join_request_rejected(
+            applicant=participation.user,
             activity=activity,
-            request_user=request.user,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)

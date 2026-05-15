@@ -18,11 +18,11 @@ def test_notifications_list_filters_mark_read_unread_read_all_and_delete(
     other_user,
     notification_factory,
 ):
-    unread = notification_factory(user, type=Notification.Type.SYSTEM, title='Unread')
-    read = notification_factory(user, type=Notification.Type.REQUEST, title='Read', read_at=timezone.now())
-    notification_factory(other_user, type=Notification.Type.SYSTEM)
+    unread = notification_factory(user, type=Notification.Type.ACTIVITY_CANCELLED, title='Unread')
+    read = notification_factory(user, type=Notification.Type.JOIN_REQUEST, title='Read', read_at=timezone.now())
+    notification_factory(other_user, type=Notification.Type.ACTIVITY_CANCELLED)
 
-    list_response = auth_client.get('/me/notifications?unread_only=true&type=system')
+    list_response = auth_client.get('/me/notifications?unread_only=true&type=activity_cancelled')
     assert list_response.status_code == status.HTTP_200_OK
     assert [item['id'] for item in list_response.json()['items']] == [str(unread.id)]
 
@@ -97,7 +97,7 @@ def test_notify_followers_of_new_activity_creates_notifications_only_for_subscri
     # подписчик получил уведомление
     assert Notification.objects.filter(
         user=follower,
-        type=Notification.Type.SOCIAL,
+        type=Notification.Type.NEW_ACTIVITY,
         activity=activity,
     ).exists()
     # неподписчик — нет
@@ -117,10 +117,10 @@ def test_notify_organizer_of_new_rating_creates_notification(
 
     notif = Notification.objects.get(
         user=activity.organizer,
-        type=Notification.Type.SOCIAL,
+        type=Notification.Type.NEW_REVIEW,
         activity=activity,
     )
-    assert '4/5' in notif.message
+    assert '4★' in notif.message
 
 
 def test_send_activity_reminders_sends_once_to_accepted_participants(
@@ -146,7 +146,7 @@ def test_send_activity_reminders_sends_once_to_accepted_participants(
 
     # accepted получил
     assert Notification.objects.filter(
-        user=accepted, type=Notification.Type.REMINDER, activity=activity,
+        user=accepted, type=Notification.Type.ACTIVITY_REMINDER, activity=activity,
     ).exists()
     # pending и rejected — нет
     assert not Notification.objects.filter(user=pending).exists()
@@ -155,7 +155,7 @@ def test_send_activity_reminders_sends_once_to_accepted_participants(
     # повторный вызов не плодит дубли
     send_activity_reminders()
     assert Notification.objects.filter(
-        user=accepted, type=Notification.Type.REMINDER, activity=activity,
+        user=accepted, type=Notification.Type.ACTIVITY_REMINDER, activity=activity,
     ).count() == 1
 
 
@@ -180,11 +180,11 @@ def test_send_rate_requests_skips_users_who_already_rated(
 
     # тот, кто ещё не оценил — получает запрос
     assert Notification.objects.filter(
-        user=not_rated_user, type=Notification.Type.RATE_REQUEST,
+        user=not_rated_user, type=Notification.Type.RATE_ACTIVITY,
     ).exists()
     # тот, кто уже оценил — не получает
     assert not Notification.objects.filter(
-        user=rated_user, type=Notification.Type.RATE_REQUEST,
+        user=rated_user, type=Notification.Type.RATE_ACTIVITY,
     ).exists()
 
 

@@ -85,8 +85,12 @@ def test_activity_detail_patch_delete_cancel_and_permissions(
 
     deletable = activity_factory(organizer=user)
     deleted = api_client.delete(f'/activities/{deletable.id}')
+    deletable.refresh_from_db()
     assert deleted.status_code == status.HTTP_204_NO_CONTENT
-    assert not Activity.objects.filter(id=deletable.id).exists()
+    # Активную активность не сносим физически — переводим в cancelled,
+    # чтобы старые уведомления и история не вели в никуда.
+    assert deletable.status == Activity.Status.CANCELLED
+    assert deletable.cancelled_at is not None
 
 
 def test_recommended_excludes_joined_and_organizer_activities(

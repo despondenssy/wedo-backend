@@ -349,17 +349,34 @@
       },
       "Notification": {
         "type": "object",
+        "description": "Уведомление, отдаваемое в ленте и через FCM-push. action_required отдаётся динамически — true только если действие ещё актуально (заявка ещё pending, оценка ещё не оставлена, организаторство ещё активно).",
         "properties": {
           "id": { "type": "string" },
-          "type": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "join_request",
+              "join_request_approved",
+              "join_request_rejected",
+              "activity_reminder",
+              "new_activity",
+              "rate_activity",
+              "activity_cancelled",
+              "new_review",
+              "organizer_assigned"
+            ]
+          },
           "title": { "type": "string" },
           "message": { "type": "string" },
           "timestamp": { "type": "string", "format": "date-time" },
           "read": { "type": "boolean" },
           "activity_id": { "type": "string", "nullable": true },
-          "request_user_id": { "type": "string", "nullable": true },
-          "action_required": { "type": "boolean" },
-          "activity_title": { "type": "string", "nullable": true }
+          "actor_user_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Пользователь из-за действия которого появилось уведомление: для join_request — заявитель, для new_activity — организатор, для new_review — автор оценки."
+          },
+          "action_required": { "type": "boolean" }
         },
         "required": ["id", "type", "title", "message", "timestamp", "read", "action_required"]
       },

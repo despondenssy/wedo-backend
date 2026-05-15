@@ -161,12 +161,11 @@ def notification_factory(db):
         from notifications.models import Notification
 
         defaults = {
-            'type': Notification.Type.SYSTEM,
+            'type': Notification.Type.ACTIVITY_CANCELLED,
             'title': 'Notice',
             'message': 'Message',
             'activity': None,
-            'request_user': None,
-            'activity_title': None,
+            'actor_user': None,
             'action_required': False,
         }
         defaults.update(kwargs)

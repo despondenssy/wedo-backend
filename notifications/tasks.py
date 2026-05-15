@@ -1,6 +1,9 @@
 """Фоновые задачи для уведомлений.
 
-Триггеры делятся на два типа:
+Все триггеры делают одно — собирают аудиторию и зовут соответствующую фабрику
+из `notifications.services`. Сами шаблоны текстов и логика создания живут там.
+
+Делятся на два типа:
 - event-based — вызываются `.delay()` из views при действии пользователя
   (создал активность, оставил оценку);
 - time-based — запускаются Celery beat по расписанию из CELERY_BEAT_SCHEDULE
@@ -13,32 +16,12 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from .models import Notification
-
-
-def _create_notification_and_push(
-    user, type, title, message, activity=None, request_user=None,
-):
-    """Создаёт in-app уведомление и шлёт push на устройства пользователя.
-
-    Внутренний helper. Вызывается из задач Celery — латентность FCM здесь
-    не блокирует пользовательский запрос, поэтому push шлётся синхронно.
-    """
-    from .firebase import send_push_to_user
-
-    Notification.objects.create(
-        user=user,
-        type=type,
-        title=title,
-        message=message,
-        activity=activity,
-        request_user=request_user,
-        activity_title=activity.title if activity else None,
-    )
-
-    data = {'type': type}
-    if activity:
-        data['activityId'] = str(activity.id)
-    send_push_to_user(user, title, message, data=data)
+from .services import (
+    notify_activity_reminder,
+    notify_new_activity,
+    notify_new_review,
+    notify_rate_activity,
+)
 
 
 # ============================================================================
@@ -48,15 +31,17 @@ def _create_notification_and_push(
 
 @shared_task
 def notify_followers_of_new_activity(activity_id):
-    """Социальное: пользователь, на которого подписаны, создал активность —
-    шлём уведомление всем подписчикам.
-    """
+    """Подписчики организатора получают уведомление о новой активности."""
     from activities.models import Activity
     from subscriptions.models import Subscription
 
     try:
         activity = Activity.objects.select_related('organizer').get(id=activity_id)
     except Activity.DoesNotExist:
+        return
+
+    # KudaGo-события без организатора не порождают уведомлений
+    if activity.organizer is None:
         return
 
     follower_ids = Subscription.objects.filter(
@@ -67,21 +52,16 @@ def notify_followers_of_new_activity(activity_id):
     followers = User.objects.filter(id__in=follower_ids, is_active=True)
 
     for follower in followers:
-        _create_notification_and_push(
-            user=follower,
-            type=Notification.Type.SOCIAL,
-            title='Новая активность',
-            message=f'{activity.organizer.name} создал(а) «{activity.title}»',
+        notify_new_activity(
+            follower=follower,
+            organizer=activity.organizer,
             activity=activity,
-            request_user=activity.organizer,
         )
 
 
 @shared_task
 def notify_organizer_of_new_rating(rating_id):
-    """Социальное: на твою активность оставили оценку/отзыв —
-    шлём уведомление организатору.
-    """
+    """Организатор получает уведомление о новой оценке его активности."""
     from ratings.models import ActivityRating
 
     try:
@@ -92,16 +72,15 @@ def notify_organizer_of_new_rating(rating_id):
         return
 
     organizer = rating.activity.organizer
-    if rating.user_id == organizer.id:
-        return  # на свою же активность поставил — не уведомляем
+    if organizer is None or rating.user_id == organizer.id:
+        # организатора нет (KudaGo) или сам себя оценил — пропускаем
+        return
 
-    _create_notification_and_push(
-        user=organizer,
-        type=Notification.Type.SOCIAL,
-        title='Новый отзыв',
-        message=f'{rating.user.name} оценил(а) «{rating.activity.title}» на {rating.rating}/5',
+    notify_new_review(
+        organizer=organizer,
+        reviewer=rating.user,
         activity=rating.activity,
-        request_user=rating.user,
+        rating_value=rating.rating,
     )
 
 
@@ -116,7 +95,7 @@ def send_activity_reminders():
 
     Beat запускает задачу каждые 5 минут. Берём активности, начинающиеся в
     окне [now+55min; now+65min], и шлём всем accepted-участникам напоминание.
-    Дубликаты отсекаются проверкой существующих REMINDER-уведомлений.
+    Дубликаты отсекаются проверкой существующих уведомлений того же типа.
     """
     from activities.models import Activity
     from participation.models import Participation
@@ -134,7 +113,7 @@ def send_activity_reminders():
     for activity in activities:
         already_notified = set(Notification.objects.filter(
             activity=activity,
-            type=Notification.Type.REMINDER,
+            type=Notification.Type.ACTIVITY_REMINDER,
         ).values_list('user_id', flat=True))
 
         participations = Participation.objects.filter(
@@ -148,13 +127,7 @@ def send_activity_reminders():
         for p in participations:
             if p.user_id in already_notified:
                 continue
-            _create_notification_and_push(
-                user=p.user,
-                type=Notification.Type.REMINDER,
-                title='Скоро начнётся',
-                message=f'Через час начинается «{activity.title}»',
-                activity=activity,
-            )
+            notify_activity_reminder(participant=p.user, activity=activity)
 
 
 @shared_task
@@ -162,8 +135,8 @@ def send_rate_requests():
     """Запрос оценки после окончания активности.
 
     Beat запускает задачу каждые 5 минут. Берём активности, завершившиеся
-    за последние ~10 минут (с запасом), и шлём всем attended-участникам,
-    которые ещё не оставили оценку, просьбу её оставить.
+    за последние ~10 минут, и шлём всем attended-участникам, которые ещё
+    не оставили оценку, просьбу её оставить.
     """
     from activities.models import Activity
     from participation.models import Participation
@@ -179,7 +152,7 @@ def send_rate_requests():
     for activity in activities:
         already_notified = set(Notification.objects.filter(
             activity=activity,
-            type=Notification.Type.RATE_REQUEST,
+            type=Notification.Type.RATE_ACTIVITY,
         ).values_list('user_id', flat=True))
 
         already_rated = set(ActivityRating.objects.filter(
@@ -194,13 +167,7 @@ def send_rate_requests():
         for p in participations:
             if p.user_id in already_notified or p.user_id in already_rated:
                 continue
-            _create_notification_and_push(
-                user=p.user,
-                type=Notification.Type.RATE_REQUEST,
-                title='Оцените событие',
-                message=f'Как вам «{activity.title}»? Поделитесь впечатлением.',
-                activity=activity,
-            )
+            notify_rate_activity(participant=p.user, activity=activity)
 
 
 @shared_task
