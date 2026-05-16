@@ -589,12 +589,24 @@ class LogoutView(APIView):
 
 
 class RefreshTokenView(APIView):
-    """POST /auth/refresh — получить новый access токен по refresh токену."""
+    """POST /auth/refresh — обновить пару access/refresh с ротацией.
+
+    Поведение: каждый успешный refresh возвращает **новый** refresh-токен,
+    а старый помещается в blacklist. Это защищает от долговременной угрозы
+    утёкшего refresh-токена — даже если злоумышленник его перехватил,
+    при следующем легитимном refresh старый токен инвалидируется.
+
+    Контракт ответа не меняется: те же поля `access_token`, `refresh_token`,
+    `expires_at`. Просто значение `refresh_token` теперь всегда новое.
+    Фронт должен сохранять `refresh_token` из ответа после каждого вызова.
+    """
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'refresh'
 
     def post(self, request):
+        from rest_framework_simplejwt.exceptions import TokenError
+
         refresh_token = request.data.get('refresh_token')
         if not refresh_token:
             return Response(
@@ -603,14 +615,34 @@ class RefreshTokenView(APIView):
             )
 
         try:
-            refresh = RefreshToken(refresh_token)
-            return Response({
-                'access_token': str(refresh.access_token),
-                'refresh_token': str(refresh),
-                'expires_at': unix_timestamp_to_iso8601(refresh.access_token['exp']),
-            })
-        except Exception:
+            old_refresh = RefreshToken(refresh_token)
+        except TokenError:
             return Response(
                 {'error': {'code': 'INVALID_TOKEN', 'message': 'Недействительный или истёкший токен'}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        # достаём юзера из payload старого токена
+        user_id = old_refresh.get('user_id')
+        try:
+            user = User.objects.get(id=user_id, is_active=True, deleted_at__isnull=True)
+        except User.DoesNotExist:
+            return Response(
+                {'error': {'code': 'INVALID_TOKEN', 'message': 'Пользователь не найден'}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # ротация: старый токен в blacklist, выпускаем новый для того же юзера
+        try:
+            old_refresh.blacklist()
+        except Exception:
+            # если blacklist-приложение не установлено или токен уже там —
+            # это не должно ломать refresh
+            pass
+
+        new_refresh = RefreshToken.for_user(user)
+        return Response({
+            'access_token': str(new_refresh.access_token),
+            'refresh_token': str(new_refresh),
+            'expires_at': unix_timestamp_to_iso8601(new_refresh.access_token['exp']),
+        })

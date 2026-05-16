@@ -72,6 +72,64 @@ def test_register_login_refresh_and_logout(api_client, user_factory):
     assert logout.status_code == status.HTTP_204_NO_CONTENT
 
 
+def test_refresh_rotates_and_blacklists_old_token(api_client, user):
+    """
+    /auth/refresh реализует ротацию: возвращает НОВЫЙ refresh-токен,
+    старый помещается в blacklist. Повторная попытка использовать
+    старый токен возвращает 401.
+    """
+    login = api_client.post(
+        '/auth/login',
+        {'email': user.email, 'password': 'StrongPass123'},
+        format='json',
+    )
+    assert login.status_code == status.HTTP_200_OK
+    old_refresh = login.json()['tokens']['refresh_token']
+
+    first_refresh = api_client.post(
+        '/auth/refresh', {'refresh_token': old_refresh}, format='json',
+    )
+    assert first_refresh.status_code == status.HTTP_200_OK
+    new_refresh = first_refresh.json()['refresh_token']
+    # ротация: новый токен — это другой токен
+    assert new_refresh != old_refresh
+
+    # попытка повторно использовать СТАРЫЙ токен — теперь в blacklist'е
+    replay = api_client.post(
+        '/auth/refresh', {'refresh_token': old_refresh}, format='json',
+    )
+    assert replay.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_refresh_chain_each_step_invalidates_previous(api_client, user):
+    """Цепочка ротаций: после второго refresh первый новый тоже инвалидирован."""
+    login = api_client.post(
+        '/auth/login',
+        {'email': user.email, 'password': 'StrongPass123'},
+        format='json',
+    )
+    refresh_1 = login.json()['tokens']['refresh_token']
+
+    response_2 = api_client.post(
+        '/auth/refresh', {'refresh_token': refresh_1}, format='json',
+    )
+    refresh_2 = response_2.json()['refresh_token']
+
+    response_3 = api_client.post(
+        '/auth/refresh', {'refresh_token': refresh_2}, format='json',
+    )
+    assert response_3.status_code == status.HTTP_200_OK
+    refresh_3 = response_3.json()['refresh_token']
+
+    # refresh_2 после использования тоже в blacklist
+    replay = api_client.post(
+        '/auth/refresh', {'refresh_token': refresh_2}, format='json',
+    )
+    assert replay.status_code == status.HTTP_401_UNAUTHORIZED
+    # refresh_3 ещё рабочий
+    assert refresh_3 != refresh_2
+
+
 def test_register_requires_show_birth_date(api_client):
     payload = register_payload()
     payload.pop('show_birth_date')

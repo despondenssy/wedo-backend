@@ -190,6 +190,11 @@ from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    # ротация refresh-токенов: каждый refresh возвращает новый refresh + blacklist старого.
+    # эти настройки используются встроенным TokenRefreshView; наш RefreshTokenView
+    # реализует ту же логику вручную (см. users/views.py:RefreshTokenView).
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 AUTH_USER_MODEL = 'users.User'

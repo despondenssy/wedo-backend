@@ -643,7 +643,8 @@
     "/auth/refresh": {
       "post": {
         "tags": ["auth"],
-        "summary": "Refresh access token",
+        "summary": "Refresh access token (with rotation)",
+        "description": "Возвращает новую пару access/refresh-токенов. Реализована **ротация refresh-токенов**: переданный в запросе refresh-токен после успешного refresh помещается в blacklist и больше не работает. Клиент обязан сохранять новое значение `refresh_token` из ответа после каждого вызова — иначе следующий refresh вернёт 401.",
         "security": [],
         "requestBody": {
           "required": true,
