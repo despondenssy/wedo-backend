@@ -46,3 +46,6 @@ Thumbs.db
 media/
 firebase-service-account.json
 *.Zone.Identifier
+
+# Ruff
+.ruff_cache/

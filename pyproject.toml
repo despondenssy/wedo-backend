@@ -1,0 +1,74 @@
+[tool.ruff]
+# Версия Python
+target-version = "py312"
+
+# Какие файлы проверять
+include = ["*.py", "*.pyi"]
+
+# Какие директории игнорировать
+exclude = [
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "migrations",
+    ".pytest_cache",
+    "media",
+]
+
+# Максимальная длина строки (как в Django)
+line-length = 119
+
+# Какие правила включить
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade (для Python 3.12)
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "ARG", # flake8-unused-arguments
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "T20", # flake8-print
+    "RUF", # Ruff-specific rules
+]
+
+# Игнорировать для всего проекта
+ignore = [
+    "E501",    # Line too long (проверяет black)
+    "RUF001",  # Кириллица в строках — в русском проекте это шум
+    "RUF002",  # Кириллица в докстрингах — то же самое
+    "RUF003",  # Кириллица в комментариях — то же самое
+    "RUF012",  # Mutable class attrs — в Django это стандарт (Meta, permission_classes)
+    "ARG001",  # Неиспользуемые аргументы функций — будет исправлено позже
+    "ARG002",  # Неиспользуемые аргументы методов — будет исправлено позже
+    "F841",    # Неиспользуемые переменные — будет исправлено позже
+    "N806",    # Регистр переменных — будет исправлено позже
+    "B007",    # Неиспользуемые переменные цикла — будет исправлено позже
+    "SIM105",  # try-except-pass → contextlib.suppress — будет исправлено позже
+    "RUF005",  # Распаковка списков — будет исправлено позже
+    "E402",    # Импорт не в начале файла — будет исправлено позже
+    "F402",    # Переменная переопределяет импорт — будет исправлено позже
+    "B904",    # raise without from in except — будет исправлено позже
+    "T201",    # print() в коде — будет исправлено позже
+    "RUF013",  # implicit Optional — будет исправлено позже
+    "RUF059",  # Неиспользуемая распакованная переменная — будет исправлено позже
+    "SIM108",  # if-else → ternary — будет исправлено позже
+    "DTZ011",  # date.today() без timezone — будет исправлено позже
+    "SIM115",  # open() без context manager — будет исправлено позже
+]
+
+# Настройка isort (сортировка импортов)
+[tool.ruff.lint.isort]
+known-first-party = ["config", "activities", "users", "notifications", "files", "participation", "ratings", "subscriptions"]
+known-third-party = ["django", "rest_framework", "celery", "pytest"]
+
+# Настройка форматтера (как Black)
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

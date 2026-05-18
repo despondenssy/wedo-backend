@@ -213,3 +213,39 @@ python manage.py cleanup_kudago
 ```bash
 python manage.py cleanup_kudago --dry-run
 ```
+
+---
+
+## Линтер (Ruff)
+
+В проекте используется [Ruff](https://docs.astral.sh/ruff/) — быстрый линтер и форматтер для Python.
+
+### Основные команды
+
+```bash
+# Проверить код на ошибки стиля
+ruff check .
+
+# Автоматически исправить ошибки (где возможно)
+ruff check --fix .
+
+# Отформатировать код
+ruff format .
+
+# Проверить, что код отформатирован правильно (без изменений)
+ruff format --check .
+```
+
+### Быстрая проверка одного файла
+
+```bash
+ruff check activities/views.py
+```
+
+### Настройка
+
+Конфигурация Ruff находится в файле [`pyproject.toml`](pyproject.toml) в корне проекта. Там указаны:
+- Какие правила включены
+- Какие директории игнорировать (migrations, .git и т.д.)
+- Настройки форматтера
+- Сортировка импортов (isort)
